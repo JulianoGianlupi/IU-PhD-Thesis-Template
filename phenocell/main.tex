@@ -1,0 +1,111 @@
+\documentclass{article}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PACKAGES
+\usepackage[utf8]{inputenc}
+% \usepackage{hyperref}
+
+\usepackage{graphicx}  %for images and plots
+\usepackage[letterpaper, left=1.5in, right=1in, top=1in, bottom=1in]{geometry}
+\usepackage[doublespacing]{setspace}  %use this package to set linespacing as desired
+\usepackage{times}  %set Times New Roman as the font
+\usepackage[explicit]{titlesec}  %title control and formatting
+\usepackage[titles]{tocloft}  %table of contents control and formatting
+\usepackage[backend=bibtex, sorting=none]{biblatex}  %reference manager
+\usepackage[bookmarks=true, hidelinks]{hyperref}
+\usepackage[page]{appendix}  %for appendices
+\usepackage{rotating}  %for rotated, landscape images
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{float}
+
+\usepackage{subcaption}
+
+\usepackage{pythonhighlight}
+\usepackage{minted}
+
+
+\usepackage{lineno}
+\linenumbers
+
+% \usepackage{algorithm}
+% \usepackage{algpseudocode}
+\usepackage[linesnumbered,lined,boxed,commentsnumbered]{algorithm2e}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% COMMANDS
+% \hypersetup{
+%     colorlinks=true,
+%     linkcolor=blue}
+
+\renewcommand{\textit}[1]{\emph{#1}}
+% \renewcommand{\listingscaption}{Code}
+
+\definecolor{light-gray}{gray}{0.95}
+\newcommand{\code}[1]{\colorbox{light-gray}{\texttt{#1}}}
+
+
+\newcommand{\dif}[2]{\frac{d#1}{d#2}}
+\newcommand{\dift}[1]{\dif{#1}{t}}
+
+\newcommand{\pcp}{PhenoCellPy}
+\newcommand{\pcps}{\pcp\space}
+
+\newcommand{\ccd}{CompuCell3D}
+\newcommand{\ccds}{\ccd\space}
+
+\newcommand\footnoteref[1]{\protected@xdef\@thefnmark{\ref{#1}}\@footnotemark}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Bibliography
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%Add your bibliography file here
+\bibliography{references}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\title{PhenoCellPy: A Python package for biological cell behavior modeling}
+\author{Juliano F. Gianlupi$^{1 ,}$*, T.J. Sego$^2$, James P. Sluka$^1$, James A. Glazier$^1$}
+
+% \date{January 2023}
+\date{$^{1 }$Department of Intelligent Systems Engineering and Biocomplexity Institute, Indiana University Bloomington, Bloomington, IN, USA\\\vspace{.75em}$^2$Department of Medicine, University of Florida, Gainesville, FL, USA\\\vspace{1.5em}\today\\\vspace{1.5em}*Corresponding author\\2425 N Milo B Sampson Ln, Office 185, Bloomington, IN 47408, USA\\\vspace{.75em}\href{mailto:jferrari@iu.edu}{jferrari@iu.edu}}
+
+\begin{document}
+
+\maketitle
+% \newpage
+\vspace{-2em}
+\begin{abstract}
+    % say in the abstract that: PhysiCell has this really good phenotype description/submodel, we want to make it available to any multicellular modeling framework that uses python.
+    PhysiCell, a mechanistic center-based agent-based modeling framework, describes sequences of cell behaviors in a very elegant way with its phenotype submodel. However, its phenotypes are not usable in other frameworks, and the creation of a new phenotype is not straight forward.
+    PhenoCellPy is an open-source Python package that implements PhysiCell's phenotypes and their methods in a general way, that is easily extended and embedded into other python-based models. \pcps defines methods for modeling sequences of cell behaviors and states (\textit{e.g.}, the cell cycle, or the Phases of cellular necrosis). PhenoCellPy defines Python classes for the Cell Volume (which it subdivides between the cytoplasm and nucleus) and its evolution, the state of the cell and the behaviors the cell displays in each state (called the Phase), and the sequence of behaviors (called the Phenotype). PhenoCellPy's can extend existing modeling frameworks as an embedded model. It integrates with the frameworks by defining the cell states (phases), signaling when a state change occurs, if division occurs, and by receiving information from the framework (\textit{e.g.}, how much interferon the cell is exposed to).
+    % supports integration with modeling frameworks in a number of ways, \textit{e.g.}, messaging  when a change in behavior occurs, . 
+    PhenoCellPy can function with any python-based modeling framework that supports Python 3, NumPy and SciPy. 
+\end{abstract}
+
+%%%%%%%%%%%%%%%%%%%
+% WHOLE TEXT
+% \input{body.tex}
+\include{body.tex}
+
+%%%%%%%%%%%%%%%%
+% References
+%%%%%%%%%%%%%%%%
+%\begin{singlespace}  % use single-line spacing for multi-line text within a single reference
+%	\setlength\bibitemsep{\baselineskip}  %manually set separataion betwen items in bibliography to double space
+%	\printbibliography[heading=bibintoc,title={References}]
+%\end{singlespace}
+\printbibliography[heading=bibintoc,title={References}]
+%\addcontentsline{toc}{chapter}{References}  %add References section to Table of Contents
+
+
+%%%%%%%%%%%%%%%%%%%
+
+% SUPPLEMENTAL MATERIALS
+
+\input{supplemental.tex}
+
+
+\end{document}

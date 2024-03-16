@@ -1,0 +1,119 @@
+\subsection{CompuCell3D}\label{sec:examples:cc3d}
+For CompuCell3D~\cite{swat_multi-scale_2012} the reccomended method of using PhenoCellPy is to initialize the Phenotype in the steppable start function, and add it as a cell dictionary entry (see Listing~\ref{code:pcp:attach-cc3d}). Then, in the steppable step function, loop over cells that have a Phenotype model, call the Phenotype time-step, and use the time-step return values as needed (see Listing~\ref{code:pcp:step}).
+
+See CompuCell3D's manual~\cite{cc3d_python_scripting_manual} for more information on steppables, cell dictionaries, and other CompuCell3D concepts.
+
+
+\subsubsection{Ki-67 Basic Cycle Improved Division}\label{sec:examples:cc3d:ki67-improved}
+
+The stock Ki-67 Basic Cycle causes CompuCell3D cells to behave in non-biological ways. This happens because Cellular Potts Model~\cite{graner1992simulation} (CompuCell3D's paradigm) cells are made of several voxels~\cite{swat_multi-scale_2012}, and the proliferating Phase of Ki-67 has a set period. This means that the simulated cells in CompuCell3D may not grow to the doubling volume before they are flagged for cell division. This means that the median cell volume of the cells in the simulation decreases.
+
+Ki-67 Basic Cycle Improved Division fixes this by defining a custom transition function, see Listing~\ref{code:ex:cc3d:ki67-improved}. It still is a deterministic transition function, however, in addition of monitoring $T$ (time spend in phase), it also monitors the simulated cell volume ($V_S$) and checks if it is bigger than the doubling volume ($V_D$). The custom transition function evaluates the transition probability as,
+
+\begin{equation}\label{eq:ki67:transition}
+    P(\text{division}) = \begin{cases} 1 & \text{if }T > \tau \wedge V_S \geq V_D\\
+    0 & \text{else}
+    \end{cases}\,\,.
+\end{equation}
+
+The full implementation of this example is in Supplemental Materials~\ref{suplemental:cc3d-ex:ki67-improved}.
+
+\begin{listing}[!htpb]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+% bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def Ki67pos_transition(*args):
+    # args = [cc3d cell volume, phase's target volume, time in 
+    phase, phase duration
+    return args[0] >= args[1] and args[2] > args[3]
+\end{minted}
+\caption{Ki-67 Basic Cycle Improved Division transition function}\label{code:ex:cc3d:ki67-improved}
+\end{listing}
+
+\subsection{Tissue Forge}\label{sec:examples:tf}
+For Tissue Forge~\cite{sego_tissue_2022} the suggested method of using PhenoCellPy is to initialize the Phenotype in a similar way to Tissue Forge's cell initialization, keep a dictionary of agent IDs as keys and Phenotype models as values, and create a Tissue Forge event~\cite{sego_tissue_2022} to time-step the Phenotype objects. A generic implementation of PhenoCellPy within Tissue Forge can be found in Listing~\ref{code:ex:tf:init} and~\ref{code:ex:tf:init:part2}. Supplemental Information~\ref{suplemental:tf-ex:ki67} shows the implementation of the Ki-67 Basic Cycle Phenotype.
+\begin{listing}[H]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+% bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+import numpy as np
+import tissue_forge as tf
+import PhenoCellPy as pcp
+# dimensions of universe
+dim = [10., 10., 10.]
+# new simulator
+tf.init(dim=dim)
+# defining the inter-cell potential
+pot = tf.Potential.morse(d=3, a=5, min=-0.8, max=2)
+# define Cell class
+mass = 40
+class CellType(tf.ParticleTypeSpec):
+    mass = mass
+    target_temperature = 0
+    radius = radius
+    dynamics = tf.Overdamped
+# initialize cell
+Cell = CellType.get()
+# bind the potential with the *TYPES* of the particles
+tf.bind.types(pot, Cell, Cell)
+# uniform random cube
+positions = np.random.uniform(low=0, high=10, size=(10, 3))
+# place cells at the positions 
+for pos in positions:
+    Cell(pos)
+# initialize Phenotype
+ki67_basic = pcp.phenotypes.Ki67Basic(dt=dt)
+# Pair the cells ids with the Phenotype model
+global cells_cycles
+cells_cycles = {}
+for cell in Cell.items():
+    cells_cycles[f"{cell.id}"] = ki67_basic.copy()
+\end{minted}
+\caption{Generic implementation of PhenoCellPy within Tissue Forge. Part 1}\label{code:ex:tf:init}
+\end{listing}
+
+\begin{listing}[H]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+% bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+# Defining the Phenotype stepping event 
+def step(event):
+    for cell in Cell.items():
+        pcycle = cells_cycles[f"{cell.id}"]
+        pcycle.current_phase.simulated_cell_volume = p.mass * density
+        phase_change, removal, division = pcycle.time_step_phenotype()
+        if phase_change:
+            phase_change_tasks(cell)
+        if removal:
+            removal_tasks(cell)
+        if division:
+            division_tasks(cell)
+        other_tasks(cell)
+    return 0
+# running the time-stepping event every time-step
+tf.event.on_time(invoke_method=step_cycle_and_divide, 
+                 period=.9*tf.Universe.dt)
+# run the simulator interactive
+tf.run()
+\end{minted}
+\caption{Generic implementation of PhenoCellPy within Tissue Forge. Part 2}\label{code:ex:tf:init:part2}
+\end{listing}
+
+
+
+

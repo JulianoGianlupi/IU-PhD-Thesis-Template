@@ -1,0 +1,120 @@
+
+The Phase is the "base unit" of the Phenotype. Each Phase has as attributes  a descriptive name (\textit{e.g.}, S, G, M, necrotic swelling), an index (\textit{i.e.} in which position of the sequence of Phases it is), the index of the previous and next Phases, the time-step length ($dt$), the name of the time unit (\textit{e.g.,} second, minute), how long the Phase should be ($\tau$, "\code{phase\_duration}" in the code, see Section~\ref{sec:meth:phase:trans} and~\ref{app:sec:meth:phase:trans}), a flag setting the transition to the next Phase to be stochastic or deterministic (see Section~\ref{sec:meth:phase:trans} and~\ref{app:sec:meth:phase:trans}), a flag for mitosis or meiosis at phase exit, a flag for removal from the simulation at phase exit (\textit{i.e.}, the cell dies, is killed, leaves the simulated domain). The Phase class also keeps track of the amount of time the cell has spent in the current Phase ($T$), and (optionally) the volume of the cell in the simulation. Although the cell volume definition and update is handled by the Cell Volume class (Section~\ref{sec:meth:vol}), the volume change rates is an attribute of the Phase class. It's important to note that the volume of the cell defined by PhenoCellPy's volume class may differ from the volume of the cell in the simulation.
+
+The Phase class also has several functions defined, to time-step the model \\*(Section~\ref{sec:meth:phase:step}), to update the cellular volume model (Section~\ref{sec:meth:vol}), to double the target volume of the cellular volume model, and to evaluate if the transition to the next Phase should occur (Section~\ref{sec:meth:phase:trans} and~\ref{app:sec:meth:phase:trans}). It also has place-holder functions that can be replaced by user-defined ones, one that should be executed upon Phase entry \\*(\code{entry\_function(*args)}), one just before Phase exit \\*(\code{exit\_function(*args)}), one for exiting the Phenotype and entering senescence (\code{arrest\_function(*args)}), and one that is executed at each time-step \\*(\code{user\_phase\_time\_step(*args)}), see Section~\ref{sec:meth:pheno:go-quies}. 
+
+\subsubsection{Phase class initialization}\label{sec:meth:phase:init}
+
+The Phase \code{\_\_init\_\_} function performs some checks on attribute values, \textit{e.g.} $dt>0$, a negative or zero time-step makes no sense, the custom functions should be functions, and so on. Initializes attributes to set values, and initializes the Cellular Volume model class. The Phase \code{\_\_init\_\_} function is in Supplemental Materials~\ref{suplemental:phase:init}.
+
+\subsubsection{Phase time-step}\label{sec:meth:phase:step}
+
+The Phase's time-step function is responsible for incrementing $T$ (total time the cell's spent in the current Phase, \code{time\_in\_phase} in the code) by $dt$. Then it calls the volume update function and checks if the cell exits the Phenotype and goes into senescence. Finally, it calls the Phase transition function (the default deterministic or stochastic, or a user-defined function). It returns a tuple of two boolean flags, the first flags if the cell should go to the next Phase in the Phenotype, the second if the cell should exit the Phenotype and enter senescence. The Phase time-step function is shown in Listing~\ref{code:phase:step}.
+
+\begin{listing}[!htb]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def time_step_phenotype(self):
+        self.time_in_phase += self.dt
+        self.update_volume()
+        transition_to_index = None
+        if self.user_phase_time_step is not None:
+            self.user_phase_time_step(*self.user_phase_time_step_args)
+        if self.arrest_function is not None:
+            exit_phenotype = self.arrest_function(
+            *self.exit_function_args)
+            go_to_next_phase_in_phenotype = False
+            return go_to_next_phase_in_phenotype, exit_phenotype, \
+                transition_to_index
+        else:
+            exit_phenotype = False
+        go_to_next_phase_in_phenotype = \
+            self.check_transition_to_next_phase_function(
+                *self.check_transition_to_next_phase_function_args)
+        if hasattr(go_to_next_phase_in_phenotype, "len") and \
+            len(go_to_next_phase_in_phenotype) > 1:
+                transition_to_index = go_to_next_phase_in_phenotype[1]
+                go_to_next_phase_in_phenotype = \
+                    go_to_next_phase_in_phenotype[0]
+        if go_to_next_phase_in_phenotype and self.exit_function is not \
+         None:
+            self.exit_function(*self.exit_function_args)
+            return go_to_next_phase_in_phenotype, exit_phenotype, \
+                transition_to_index
+        return go_to_next_phase_in_phenotype, exit_phenotype, \
+            transition_to_index
+\end{minted}
+\caption{Phase class time-step function.}\label{code:phase:step}
+\end{listing}
+
+
+\subsubsection{Phases volume update}\label{sec:meth:phase:vol-update}
+The volume update itself is handled by the Cell Volume class. As the volume change rates are an attribute of the Phase class, however, the Phase class has its own intermediary update volume function. This intermediary function's job is to pass the rates to the Cell Volume's update volume function. The intermediary function is shown in Listing~\ref{code:phase:vol-update}. 
+
+\begin{listing}[!ht]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def update_volume(self):
+    self.volume.update_volume(self.dt, self.fluid_change_rate, 
+        self.nuclear_volume_change_rate, 
+        self.cytoplasm_volume_change_rate, 
+        self.calcification_rate)
+\end{minted}
+\caption{Phase class volume update intermediary function.}\label{code:phase:vol-update}
+\end{listing}
+
+
+% \noindent The arguments for \code{volume.update\_volume} are discussed in Section~\ref{sec:meth:vol}.
+
+\subsubsection{Phase Transition}\label{app:sec:meth:phase:trans}
+
+The transition from one phase to the next can be either deterministic (with a set period) or stochastic (with a set transition rate) by setting the Phase's class attribute \\*"\code{fixed\_duration}" to be True (deterministic) or False (stochastic). Based on the flag, the Phase class sets its transition check function to be either \\*\code{\_transition\_to\_next\_phase\_deterministic} (for the deterministic case), Listing~\ref{code:phase:transition:deter}, or \newline\code{\_transition\_to\_next\_phase\_stochastic} (for the stochastic case), Listing~\ref{code:phase:transition:stoch}. By default, \code{fixed\_duration} is \code{False}, \textit{i.e.}, the default behavior is to use the stochastic transition. A user can also define their own transition function that can take into account other factors. As the Phase transition function can be defined by the user, our default transition functions must also have \code{*args} as its argument. 
+
+\begin{listing}[!ht]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def _transition_to_next_phase_deterministic(self, *none):
+    return self.time_in_phase > self.phase_duration
+\end{minted}
+\caption{Deterministic transition function}\label{code:phase:transition:deter}
+\end{listing}
+
+% \newpage
+% \begin{python}\label{code:phase:transition:deter}
+%     def _transition_to_next_phase_deterministic(self, *none):
+%         return self.time_in_phase > self.phase_duration
+% \end{python}
+
+\begin{listing}[!ht]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def _transition_to_next_phase_stochastic(self, *none):
+    prob = 1 - exp(-self.dt / self.phase_duration)
+    return uniform() < prob
+\end{minted}
+\caption{Stochastic transition function}\label{code:phase:transition:stoch}
+\end{listing}

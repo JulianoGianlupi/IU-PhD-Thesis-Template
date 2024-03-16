@@ -1,0 +1,249 @@
+\chapter{An overview of the Sego-Aponte-Gianlupi COVID-19 model}\label{cha:sego-aponte}
+
+In this chapter I will present the work we did with the Sego-Aponte-Gianlupi model~\cite{sego_modular_2020}. This was a joint project with several people in my lab, I then iterated on this model to create my remdesivir model~\cite{ferrari_gianlupi_multiscale_2022} (see Chapter~\ref{cha:remdes}). My colleague Joshua Aponte presented most of this work in his dissertation, therefore I will present the most relevant parts of the Sego-Aponte-Gianlupi model to my Remdesivir model in this Chapter. This Chapter was creating by adapting a section of the Remdesivir model publication~\cite{ferrari_gianlupi_multiscale_2022}.
+
+It was very clear at the start of pandemic that we needed a standard to share our methods and models with other teams, and ways to make sure our models can be easily iterated on and expanded. This lead to my investigations on how to implement models cross-platform (see Chapters~\ref{cha:translator} and~\ref{cha:phenocell}).
+% I continued my efforts of share-ability and standardization with  my PhysiCell to CompuCell3D translator (see Chapter~\ref{cha:translator}) and my PhenoCellPy Python package (see Chapter~\ref{cha:phenocell}).
+
+We began this work early in the pandemic, the goals of this work were to make a simulation that replicated the viral time course in a human patient, the variability of outcomes in a human patient that hasn't been infected before, and laying the groundwork for an extensible and reusable framework for multiscale models of infection. We also used this model to do preliminary investigations of possible treatments. I later carried on the antiviral treatment investigation in~\cite{ferrari_gianlupi_multiscale_2022}, see Chapter~\ref{cha:remdes}.
+
+\section{Introduction}\label{sec:sego-aponte:intro}
+
+To model the spread of viral infection, cytokine response, and immune cell activity in a tissue, we created a hybrid multiscale agent-based model of SARS-CoV-2 infection in a small lung tissue patch, the Sego-Aponte-Gianlupi model~\cite{sego_modular_2020}. In this model, the infection progresses as follows: the initially infected cell(s) goes through the viral life cycle; the infected cell(s) could die during the eclipse phase, if it survives it releases virus into the extracellular space (after the eclipse phase) and continues to release virus until it dies. The virus diffuses and decays extracellularly according to Fick's law (see Section~\ref{sec:remdes:met:sego_model}), 
+% and reaches neighboring cells, which in turn have a probability of internalizing virus from the extracellular space and becoming infected (eclipse phase). At early times, the only virus available to infect additional cells is that which is released by the initially infected cell(s). Early in the infection, this mechanism of cyclic infection can lead to quasi-synchronous bursts of cells becoming infected. 
+The description of the Sego-Aponte-Gianlupi model is extensive~\cite{sego_modular_2020}, Section~\ref{sec:remdes:met:sego_model}. presents a summarized description of the Sego-Aponte-Gianlupi model. 
+% I give a summary for it in Section~\ref{sec:remdes:met:sego_model}. 
+It should be noted that with the default parameters used in the Sego-Aponte-Gianlupi model all the simulated epithelial cells are eventually infected and die~\cite{sego_modular_2020}. However, depending on the parameters used, we also saw containment of the infection by the immune system~\cite{sego_modular_2020}.
+
+
+\section{Overview of the Sego-Aponte-Gianlupi Model}\label{sec:remdes:met:sego_model}
+
+\begin{figure}[H]
+     \centering
+     \includegraphics[width=.9\linewidth]{remdesivir/spatial_figs/spatial_result.png}
+     \caption{Results of one of the simulations from the antiviral investigation paper~\cite{ferrari_gianlupi_multiscale_2022}. Top row is the epithelial 2D layer, epithelial cells can be uninfected (blue), infected in the eclipse phase (green), infected secreting virus (red), or dead (black). Middle row shows the virus concentration field. Botom row is the immune cells (burgundy) 2D layer. Adapted from~\cite{ferrari_gianlupi_multiscale_2022}.}
+     \label{fig:sego:space-simple}
+ \end{figure}
+
+The Sego-Aponte-Gianlupi~\cite{sego_modular_2020} agent-based model is a 2.5-dimensional Cellular Potts model (\emph{CPM}), and is implemented in CompuCell3D~\cite{swat_multi-scale_2012}. We use CompuCell3D version 4.2.3 to generate the results in the paper. The 2.5 dimensions of the model consist of a 2D epithelial sheet with 900 non-motile epithelial cells and a 2D interstitial plane where immune cells are represented, move, and interact with the environment. The boundary conditions are periodic in the y and x directions of the simulation and use Von Neumann boundary conditions in the z direction. Diffusion-decay of cytokines and extracellular virus occurs in this interstitial plane. Together the planes represent a patch of (epithelial) lung tissue of size 0.9mmX0.9mm, represented by 90X90X2 pixels. 
+
+We made several simplifications to the biological description of the system, \emph{e.g.}, the model does not include tissue recovery or creation and release of antibodies~\cite{sego_modular_2020}. We started the simulation with one infected cell in the patch (out of 900 cells), and we ended our simulations at day 14.  The parameter values used by the Sego-Aponte-Gianlupi model are tabulated in my Appendix~\ref{sup:remdes:sec:sego_params} Tables~\ref{sup:table:sego_params:1}, \ref{sup:table:sego_params:2} and~\ref{sup:table:sego_params:3}, and in the original paper~\cite{sego_modular_2020}. The Sego-Aponte-Gianlupi model~\cite{sego_modular_2020} includes only a single immune cell type that aggregates behaviors exhibited by different immune cells, mainly NK-cells and CD8+ T cells. The immune cells chemotax up the local cytokine gradient, kill infected cells on contact, and release a cytotoxic agent depending on the severity of the infection. After exposure to local cytokine, immune cells start to release cytokine, taking part in the cytokine signaling. As the modeled immune cells present behaviors of NK-  and T-cells, the adaptive immune system is partially represented. In Sego-Aponte-Gianlupi's model, only one cytokine is used to represent all the cytokines involved in immune signaling. 
+
+The cytokine level and the number of immune cells in the infection zone define the system's overall pro- or anti-inflammatory state of the system. If the system is in the pro-inflammatory state, there is a stochastic chance of seeding new immune cells in the domain. If the immune system model is in the anti-inflammatory state, the simulation may remove immune cells through a stochastic process.
+
+ In our paper for the Sego-Aponte-Gianlupi model~\cite{sego_modular_2020}, we characterized possible end states for the simulated tissue domain. By varying the infectivity of the virus and the strength of the immune response, we simulate situations where the infection sweeps the tissue, cases where disease containment is achieved, and situations in which the infection is eliminated but reoccurs (recurring infection of SARS-CoV-2 has been observed \emph{in vitro}~\cite{hao_long-term_2020}). We also characterized a particular case of note, "\emph{failure to infect}," a situation where the infection does not spread significantly beyond the initially infected cells. This situation happens because of the stochasticity of the simulation, \emph{e.g.}  if an immune cell is seeded near the only infected cell and kills it, or if the infected cell dies before releasing infectious virus to the environment and the infection ends immediatly.
+
+ 
+
+\subsection{Epithelial cells in the Sego-Aponte-Gianlupi model}\label{sec:sego-aponte:epi}
+
+The epithelial cells in the Sego-Aponte-Gianlupi model are, as mentioned, organized in a 2D epithelial sheet of 900 cells (see Figure~\ref{fig:sego:space-simple}) and are not motile. The epithelial cells can be in one of four states: uninfected, infected (eclipse phase), virus-releasing and dead. 
+
+Each epithelial cell agent has an intracellular viral life-cycle model, and can be infected with diffusing virus (see Section~\ref{sec:sego-aponte:diffusion}), making them transition from the uninfected state to the infected state. Infection happens due to virus binding to epithelial cell receptors and being internalized (see Section~\ref{sec:remdes:met:viral_life}), the now bound receptor is no longer available for internalization of new virus. The cells can die in several ways, the intracellular levels of viral particles may kill them, the immune cells can send an apoptosis signal to them, and the immune cells can release a cytotoxic agent. During the first infection phase (infected in eclipse) virus is assembled but not released by the cell. Then the cell transition to the viral release phase and the rate of release increases exponentially and eventually saturates. 
+
+% Each epithelial cell agent has an intracellular viral life-cycle model. Virus that are diffusing (see Section~\ref{sec:sego-aponte:diffusion}) can bind to epithelial cell receptors and be internalized (see Section~\ref{sec:remdes:met:viral_life}), the now bound receptor is no longer available for internalization of new virus. 
+
+% After the intracellular level of viral particles reaches a threshold the infected (eclipse phase) cell transitions to virus-releasing. The cells can die in several ways, the intracellular levels of viral particles may kill them, the immune cells can send an apoptosis signal to them, and the immune cells can release a cytotoxic agent. The epithelial cells cannot move. 
+
+
+% E2—Viral replication. Module E2 models the viral replication cycle inside a host epithelial cell (Fig 2B). Individual cells infected with many non-lytic viruses show a characteristic three-phasic pattern in their rate of viral release. After infection and during an eclipse phase, a cell accumulates but does not yet release newly assembled viruses. In a second phase, the rate of viral release increases exponentially until the virus-releasing cell either dies or, in a third phase, saturates its rate of virus synthesis and release. Viral replication hijacks host synthesis pathways and may be limited by the availability of resources (amino acids, ATP, etc.), synthesis capability (ribosomes, endoplasmic reticulum, etc.) or intracellular viral suppression. A quantitative model of viral replication needs to be constructed and parameterized such that it reproduces these three phases.
+
+% We model viral replication based on processes associated with positive sense single-stranded RNA (+ssRNA) viruses. +ssRNA viruses initiate replication after unpacking of the viral genetic material and proteins into the cytosol (E1→E2). The viral RNA-dependent RNA polymerase transcribes a negative RNA strand from the positive RNA strand, which is used as a template to produce more RNA strands (denoted by “Viral Genome Replication” in Fig 2B). Replication of the viral genome is the only exponential amplification step in the growth of most viruses within cells. Subgenomic sequences are then translated to produce viral proteins (“Protein Synthesis” Fig 2B). Positive RNA strands and viral proteins are transported to the endoplasmic reticulum (ER) where they are packaged for release. After replication, newly synthesized viral genetic material is translated into new capsid protein and assembled into new viral particles (“Assembly and Packaging” in Fig 2B). These newly assembled viral particles initiate the viral release process (E2→E3). We assume the viral replication cycle can be modeled by defining four stages: unpacking, viral genome replication, protein synthesis, and assembly and packaging. Fig 2B illustrates these subprocesses of replication and their relation to viral internalization and release.
+
+% E3—Viral release. Module E3 models intracellular transport of newly assembled virions and release into the extracellular environment (E3→T1 and Fig 2B “Release”). We conceptualize the virus being released into the extracellular fluid above the apical surfaces of epithelial cells. Newly assembled virions are packed into vesicles and transported to the cell membrane for release into the extracellular environment (E2→E3). We assume that no regulation occurs after assembly of new virus particles, and that release into the extracellular environment can be modeled as a single-step process (E3→T1).
+
+% E4—Cell death. Module E4 models death of epithelial cells due to various mechanisms. Models the combined effect of the many types of virus-induced cell death (e.g., production of viral proteins interferes with the host cell’s metabolic, regulatory and delivery pathways) as occurring due to a high number of assembled viral particles in the viral replication cycle (E2→E4). Models cell death due to contact cytotoxicity (I3→E4). Models cell death due to oxidizing cytotoxicity (T3→E4).
+
+\subsection{Diffusion of Virus, Cytokines, and Oxidizing Chemical in the Sego-Aponte-Gianlupi Model}\label{sec:sego-aponte:diffusion}
+
+% In the Sego-Aponte-Gianlupi model, virus, cytokines, and a cytotoxic oxidative chemical 
+The \sags model has 3 different diffusive species: virus, cytokine, and a cytotoxic oxidative agent. They
+diffuse and decay extracellularly according to Fick's law over the simulated latice, 
+% (for the full diffusion equations please see Equations 20, 21, 22, 23 in~\cite{sego_modular_2020}), 
+and reach different cells.
+Virus can be internalized by the cells, cytokine triggers the immune response, and the oxidative agent kills epithelial cells.
+% which in turn have a probability of internalizing virus from the extracellular space and becoming infected (eclipse phase). 
+
+The equation for viral diffusion is,
+
+\begin{equation}\label{eq:sego:diff:vir}
+    \pdet{c_{vir}(p, t)} = D_{vir} \nabla^2c_{vir}(p, t) - \gamma_{vir}c_{vir}(p) + \frac{1}{\nu(\sigma(p))}\left[\rho(\sigma(p)) - \upsilon(\sigma(p))\right]\,\,.
+\end{equation}
+
+% TODO I'm not sure about having the pixels ponted out in the equation}
+
+\noindent Where $c_{vir}(p, t)$ is the concentration of virus at pixel $p\,=\,(i,\, j)$, $D_{vir}$ is the virus diffusion constant, $\gamma_{vir}$ the virus decay rate, $\sigma(p)$ the cell at pixel $p$, $\nu(\sigma(p))$ the volume of cell $\sigma(p)$, $\rho$ the amount of virus being released by cell $\sigma(p)$, and $\upsilon$ the amount of virus being uptaken by cell $\sigma(p)$. The uptake amount ($\upsilon$) is defined by Equation~\ref{eq:remdes:vir:uptake} and the release amount($\rho$) by Equation~\ref{eq:remdes:vir:release}. Uptake and release is done uniformly over the cell pixels.
+
+Cytokine diffusion is governed by,
+\begin{subequations}\label{eq:sego:diff:cyt}
+    \begin{equation}\label{eq:sego:diff:cyt:d}
+    \pdet{c_{cyt}(p, t)} = D_{cyt}\nabla^2 c_{cyt}(p, t) - \gamma_{cyt} c_{cyt}(p, t) + s_{cyt}(\sigma(p), t)\,\,,
+\end{equation}
+\begin{equation}\label{eq:sego:diff:cyt:s}
+    s_{cyt}(\sigma(p), t) = s^\tau_{max}(\sigma(p)) \frac{\left(c_{sig}(\sigma(p), t)\right)^{h_{cyt}}}{\left(c_{sig}(\sigma(p), t)\right)^{h_{cyt}}+\left(V^\tau_{cyt}(\sigma(p), t)\right)^{h_{cyt}}}-\omega^\tau_{cyt}(\sigma(p), t)\,\,.
+\end{equation}
+\end{subequations}
+\noindent Where $c_{cyt}(p, t)$ is the concentration of cytokine at pixel $p$, $D_{cyt}$ is the cytokine diffusion constant,  $\gamma_{cyt} c_{cyt}$ represents the amount of cytokine leaving the simulated region, and $s_{cyt}(\sigma(p), t)$ is the amount of cytokine secreted by cell $\sigma(p)$. The net amount of cytokine secreted by cell $\sigma(p)$ depends on the cell type ($\tau$), the maximum secretion for a cell of that type ($s^\tau_{max}(\sigma(p))$), the amount of cytokine uptaken by cell $\sigma$ ($\omega^\tau_{cyt}(\sigma(p), t)$), a quantity $c_{sig}(\sigma(p), t)$, and the cytokine dissociation coefficient for that cell type $V^\tau_{cyt}(\sigma(p), t)$. $c_{sig}(\sigma(p), t)$ is the amount of assembled virions for infected epithelial cells (see Equation~\ref{eq:remdes:vir:pack}), and the amount of cytokine the cell is exposed to for immune cells.
+$h_{cyt}$ is the Hill coefficient for this equation, set to 2.
+
+The oxidizing chemical diffuses according to,
+
+\begin{equation}
+    \pdet{c_{oxi}(p, t)} = D_{oxi}\nabla^2 c_{oxi}(p, t) - \gamma_{oxi} c_{oxi}(p, t) + s_{oxi}(\sigma(p))\,\,.
+\end{equation}
+\noindent Where $c_{oxi}(p, t)$ is the concentration of the agent at pixel $p$, $D_{oxi}$ is the agent's diffusion constant, $\gamma_{oxi}$ its decay rate, and $s_{oxi}(\sigma(p))$ the secretion of the agent by cell $\sigma$ occupying pixel $p$.
+
+
+
+
+\subsection{Viral Life-Cycle Model}\label{sec:remdes:met:viral_life}
+
+
+The viral life cycle model begins with virus that is diffusing in the extracellular matrix entering into the cells~\cite{sego_modular_2020}. For each cell ($\sigma$), the uptake of discrete viral particles is modeled as a stochastic process that depends on (1) the amount of virus on the cell surface ($c_{vir}(\sigma)$), (2) the cell's volume ($V(\sigma)$), (3) the number of unbound ACE2 receptors the cell has ($SR(\sigma)$), (4) the cell's initial number of unbound receptors ($R_o$), (5) the binding affinity ($k_{on}$) of the virus with the available unbound cell receptors, (6) the virus-receptor dissociation affinity ($k_{off}$), and (7) the time for a single uptake event to occur ($\alpha_{upt}$). During a short time interval $\Delta t<<\alpha_{upt}$ the probability of viral uptake (Equation~\ref{eq:remdes:vir:pr_uptake:pr}), the amount of virus internalized (if uptake occurs, Equation~\ref{eq:remdes:vir:uptake}, $\upsilon$), and the change of surface receptors (if uptake occurs, Equation~\ref{eq:remdes:vir:surf_recep}) from~\cite{sego_modular_2020} are, respectively,
+
+\begin{subequations}\label{eq:remdes:vir:pr_uptake}
+
+\begin{equation}\label{eq:remdes:vir:pr_uptake:pr}
+    Pr(Uptake(\sigma)>0) = \frac{\Delta t}{\alpha_{upt}}\frac{(c_{vir}(\sigma))^{k_{upt}}}{(c_{vir}(\sigma))^{k_{upt}}+(V_{upt})^{k_{upt}}}\,\,,
+\end{equation}
+
+\begin{equation}\label{eq:remdes:vir:pr_uptake:vupt}
+    V_{upt} = \frac{R_o}{2k_{on}V(\sigma)SR(\sigma)}\,\,,
+\end{equation}
+\end{subequations}
+
+\begin{equation}\label{eq:remdes:vir:uptake}
+    \upsilon(\sigma) = \frac{1}{\Delta t} Pr(Uptake(\sigma)>0) c_{vir}(\sigma)\,\,,
+\end{equation}
+
+\begin{equation}\label{eq:remdes:vir:surf_recep}
+\frac{dSR(\sigma)}{dt} = - \upsilon(\sigma)\,\,.
+\end{equation}
+
+\noindent Here, $V_{upt}$ is the Michaelis
+ constant of the viral concentration for which the probability of uptake is half maximum and $k_{upt}$ is the Hill coefficient. After cellular uptake, the amount of virus that enters the cell is removed from the viral field over the cell domain.
+
+A tri-phasic ordinary differential equation (\emph{ODE}) system governs intra--cellular viral reproduction in each cell ($\sigma$)~\cite{sego_modular_2020}. 
+The first phase is the eclipse phase, during it viral release is turned off,
+% The first one is the eclipse phase (no viral release). 
+after this phase,  cells start to release virus at an increasing (but saturating) rate until the cell dies. The viral replication ODE consists of four processes and variables representing different parts of the viral replication process: unpacking virions in the cell (Equation~\ref{eq:remdes:vir:unpack}), genome replication (Equation~\ref{eq:remdes:vir:replicate}), protein synthesis (Equation~\ref{eq:remdes:vir:synth}), repackaging of new virions (Equation~\ref{eq:remdes:vir:pack}). Those equations, from~\cite{sego_modular_2020}, are:
+
+\begin{equation}\label{eq:remdes:vir:unpack}
+    \frac{dU}{dt}(\sigma) = \upsilon(\sigma) - r_uU(\sigma)\,\,,
+\end{equation}
+
+\begin{equation}\label{eq:remdes:vir:replicate}
+    \frac{dR}{dt}(\sigma) = r_u U(\sigma) + r_{max}R(\sigma)\frac{r_{half}}{R(\sigma)+r_{half}} - r_tR(\sigma)\,\,,
+\end{equation}
+
+\begin{equation}\label{eq:remdes:vir:synth}
+    \frac{dP}{dt}(\sigma) = r_t R(\sigma) - r_p P(\sigma)\,\,,
+\end{equation}
+
+\begin{equation}\label{eq:remdes:vir:pack}
+    \frac{dA}{dt}(\sigma) = r_p P(\sigma) - \rho(\sigma)\,\,,
+\end{equation}
+
+\begin{equation}\label{eq:remdes:vir:release}
+    \rho(\sigma) = r_s A(\sigma)\,\,,
+\end{equation}
+
+\noindent
+with $\upsilon$ the result from Equation~\ref{eq:remdes:vir:uptake}, $r_u$ rate of unpacking the internalized virus, $r_{max}$ the maximum viral replication rate, $r_t$ the rate of translation of viral genome into RNA templates for protein synthesis, $r_p$ protein packing rate, $r_s$ assembled virus release rate. The values for the parameters in equations~\ref{eq:remdes:vir:pr_uptake}--\ref{eq:remdes:vir:release} are in Sego's Table 1~\cite{sego_modular_2020} and in my Appendix~\ref{sup:remdes:sec:sego_params}. 
+
+In my remdesivir work~\cite{ferrari_gianlupi_multiscale_2022} (Chapter~\ref{cha:remdes}), I extend the viral life-cycle model model to include the effects of the antiviral used (see Equation~\ref{eq:remdes:vir:replicate_mod} in Section~\ref{sec:remdes:met:remdes_moa}).
+
+\subsection{Immune system model}\label{sec:sego-aponte:immune}
+
+Cytokines from the simulated domain leave the tissue and reach the lymph node component of the model. The lymph node model component determines if the simulation is in a pro- or anti-inflammatory state. If the lymph node model determines that the model is in a pro-inflamatory state immune cells may be seeded in the simulated domain, if the system is in an anti-inflamatory state immune cells may be removed from the simulated domain. 
+
+The immune cell population in the simulated domain is controlled by a dimensionless signal (Equation~\ref{eq:sego-aponte:immune-signal}) and a probability of seeding/removal determined from the signal (Equation~\ref{eq:sego-aponte:immune-prob}). The signal is
+
+\begin{equation}\label{eq:sego-aponte:immune-signal}
+    \dift{S} = \beta_{add} - \beta_{sub} N_{immune} + \frac{\alpha_{sig}}{\beta_{delay}}\gamma_{cyt} c_{cyt} - \beta_{decay} S\,\,.
+\end{equation}
+
+\noindent Where $N_{immune}$ is the immune cell population in the domain, the balance of $\beta_{add}$ and $\beta_{sub} N_{immune}$ control the baseline population of immune cells in the simulated domain when there's no infection, $\gamma_{cyt} c_{cyt}$ is the total cytokine that left the simulated domain (see the cytokine diffusion Equation~\ref{eq:sego:diff:cyt}), $\alpha_{sig}$ determines the strength of the signal when it reaches the lymph node, $\beta_{delay}$ controls the delay of the signal from the simulated domain to the lymph node component, and $\beta_{decay}$ controls how fast the signal goes back to zero. The immune seeding/removal probability is
+
+\begin{subequations}\label{eq:sego-aponte:immune-prob}
+    \begin{equation}\label{eq:sego-aponte:immune-prob:add}
+        \text{Pr}(seed) = \text{erf}(\alpha_{immune}S)\text{, if } S>0\,\,,
+    \end{equation}
+    \begin{equation}\label{eq:sego-aponte:immune-prob:remove}
+        \text{Pr}(remove) = \text{erf}(-\alpha_{immune}S)\text{, if } S<0\,\,.
+    \end{equation}
+\end{subequations}
+
+\noindent Where erf is the error function, and $\alpha_{immune}$ controls the sensitivity of the system to $S$'s value.
+
+The immune cells are motile and enter the simulated domain in a naive (inactivated) state. They sense and uptake local cytokine and have a probability of activating which depends on how much cytokine they uptook (Equation 15 in~\cite{sego_modular_2020}), they deactivate after 10h. Once in the activated state, they chemotax on the local cytokine gradient. Immune cells recognaize infected epithelial cells on contact by antigent recognition and induce cell death on the epithelial cell. Epithelial cell neighbors of the killed epithelial cell can die through a bystander effect.
+
+Immune cells also secrete an cytotoxic oxidizing chemical (\textit{e.g.}, H2O2 or nitric oxide) when they are exposed to high levels of cytokine. This oxidizing chemical kills all epithelial cells when its concentration over the epithelial cell ($c_{oxi}(\sigma)$) is above a threshold ($\tau^{death}_{oxi}$).
+
+% I4—Immune cell oxidizing agent cytotoxicity. Module I4 models activated immune cell killing of target cells through the release of a diffusive and decaying oxidizing agent into the environment. Cell death is induced in uninfected, infected and virus-releasing epithelial cells when sufficiently exposed to the oxidizing agent (T3→E4).
+
+
+% Extracellular environment component.
+
+% The extracellular environment contains the immune cells, extracellular virus, cytokines and oxidative agent, and is the space where transport of viral particles (T1), cytokine molecules (T2) and the oxidizing agent (T3) occurs. We implicitly model the ECM in the extracellular environment by subsuming its geometrical, biochemical and biophysical influences on immune cell motility and virus/cytokine/agent spreading in the chosen rate laws and parameter set. Immune cells are mobile and can be either activated or inactive (I1). Inactive immune cells move through random cell motility and activated immune cells chemotax along the cytokine field (I2). The immune cell modules also account for cytotoxic effects of immune cells on contact due to antigen recognition (I3) and through the secretion of oxidizing agents (I4).
+
+% T1—Viral transport. Module T1 models diffusion of viral particles in the extracellular environment and their decay. Viral particles are transported by different mechanisms (e.g., ciliated active transport, diffusion) and media (e.g., air, mucus) at different physiological locations and through different types of tissue (e.g., nasopharyngeal track, lung bronchi and alveoli). Viral particles are eliminated by a variety of biological mechanisms. We represent these mechanisms by modeling transport of viral particles as a diffusive virus field with decay in the extracellular environment. We model transport in a thin layer above the apical surfaces of epithelial cells. Viral internalization results in the transport of a finite amount of virus from the extracellular environment into a cell and depends on the amount of local extracellular virus and number of cell surface receptors (T1-E1). Infected cells release viral particles into the extracellular environment as a result of the viral replication cycle (E3-T1).
+
+% T2—Cytokine transport. Module T2 models diffusion and clearance of immune signaling molecules in the extracellular environment. The immune response involves multiple signaling molecules acting upon different signaling pathways. We assume that the complexity of immune signaling can be functionally represented using a single chemical field that diffuses and decays in the extracellular environment. Once infected, epithelial cells secrete signaling molecules to alert the immune system (E2-T2). Locally, exposure to cytokine signaling results in activation of immune cells (T2-I1). Upon activation, immune cells migrate towards infection sites guided by cytokine (T2-I2). Lastly, activated immune cells amplify the immune signal by secreting additional cytokines into the extracellular environment (I1-T2). We model long-range effects by assuming that cytokine exfiltrates tissues and is transported to immune recruitment sites (T2-L1).
+
+% T3—Oxidizing agent burst and transport. Module T3 models diffusion and clearance of a general oxidizing agent in the extracellular environment. One of the cytotoxic mechanisms of immune cells is the release of different oxidizing agents, reactive oxygen species like H2O2 and nitric oxide. The mechanism of action of such agents varies but we assume that we can generalize such effects by modeling a single diffusive and decaying oxidizing agent field in the extracellular environment. The oxidizing agent is secreted by activated immune cells after persistent exposure to cytokine signals (I4→T3). We assume that the range of action of the oxidizing agent is short. Cell death is induced in uninfected, infected and virus-releasing epithelial cells when sufficiently exposed to the oxidizing agent (T3→E4).
+
+
+
+\subsection{Preliminary Antiviral treatment}\label{sec:sego-aponte:prelim}
+
+In the Sego-Aponte-Gianlupi~\cite{sego_modular_2020}, we did a preliminary analysis of how a treatment could be simulated. We investigated a viral replication blocker, and a viral entry blocker with the parameter variation of the viral affinity constant ($k_{on}$, Equation~\ref{eq:remdes:vir:pr_uptake:vupt}). At the time of writing the model, chloroquine was being seriously investigated as a possible viral entry blocker.
+
+We focused on a viral RNA replication blocker because it is the only part of the viral replication that has an exponential ramp up of virion production per cell (see Equations~\ref{eq:remdes:vir:unpack}-\ref{eq:remdes:vir:pack}). For this preliminary implementation we modeled our drug effect as binary, either off or at maximum effectiveness. This translates into a reduction of the maximum RNA replication rate ($r_{max}$, Equation~\ref{eq:remdes:vir:replicate}) during the simulation. We studied several $r_{max}$ reductions and several treatment start times. In my Remdesivir investigation~\cite{ferrari_gianlupi_multiscale_2022} (see Chapter~\ref{cha:remdes}), I improved the preliminary drug model to include Remdesivir's pharmacokinetics, phermacodynamics, and possible variability of Remdesivir's effectiveness on different cells.
+
+ % We focus on RNA-synthesis blockers in this paper because viral genome synthesis exponentially increases the production rate of viruses per cell, while the other stages of viral replication have linear amplification effects
+
+\section{Sego-Aponte-Gianlupi Selected Results}\label{sec:sego-aponte:results}
+
+% TODO JAMES: what results do you think I should add in? I'm thinking figure 3 for sure, and maybe figure 5/6. But I don't want to add more than that if I don't have to. Even having mentioned the preliminary drug investigation I don't want to include its results as the refinement of that is the  remdesivir paper. Maybe I should drop the section on the preliminary treatment study, or mention it on the remdesivir chapter}
+
+Using the default parameters, the Sego-Aponte-Gianlupi model~\cite{sego_modular_2020} predicts that, although the immune response slows the infection, it still sweeps the tissue and all epithelial cells die (Figure~\ref{fig:sego:progression}). However, depending on the parameters used, we also saw containment of the infection by the immune system~\cite{sego_modular_2020}. At early times, the only virus available to infect additional cells is that which is released by the initially infected cell(s). This mechanism of cyclic infection can lead to quasi-synchronous bursts of cells becoming infected early in the infection. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=.9\linewidth]{sego_aponte_figs/sego-aponte-figure3.PNG}
+    \caption{Simulation time-courses. A) Population of epithelial cells in different infection stages, uninfected in orange, infected eclipse phase in green, infected releasing virus in red, and dead cells in purple. B) Total diffusing cytokine and virus (arbitrary units), cytokine in magenta, and virus in brown. C) Immune model data, simulated domain immune cell population (grey), immune recruitment signal (S, Equation~\ref{eq:sego-aponte:immune-signal}). Adapted from~\cite{sego_modular_2020}.}
+    \label{fig:sego:progression}
+    % (B-D) Simulation time series. (B) Number of uninfected (orange), infected (green), virus-releasing (red) and dead (purple) epithelial cells vs time on a logarithmic scale (0 values are overlaid at a non-logarithmic tick for clarity). (C) Total extracellular cytokine (magenta) and total extracellular virus (brown) vs time on a logarithmic scale. (D) Value of the immune recruitment signal S (yellow) and number of immune cells (grey) vs time on a linear scale. Simulations use periodic boundary conditions in the plane of the epithelial sheet, and Neumann conditions [57] normal to the epithelial sheet.
+\end{figure}
+
+We performed a sensitivity analysis on the viral binding affinity constant ($k_{on}$, Equation~\ref{eq:remdes:vir:pr_uptake:vupt}), and the immune system delay constant ($\beta_{delay}$, Equation~\ref{eq:sego-aponte:immune-signal}). We found that a virus with greater affinity (large $k_{on}$) together with a slow immune response (large $\beta_{delay}$) result in faster infection progression and death of all simulated epithelial cells (Figure~\ref{fig:sego:kon-betadel}). A very infectious virus can still be contained by a fast-acting immune system. 
+
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width=.9\linewidth]{figures/exampleFigure.png}
+    % \caption{Caption}
+    % \label{fig:sego:kon-betadel-var}
+    \begin{subfigure}{0.9\linewidth}
+    \includegraphics[width=\textwidth]{sego_aponte_figs/sego-aponte-figure5.PNG}
+    \caption{}\label{fig:sego:kon-betadel:pop}
+    \end{subfigure}
+    \begin{subfigure}{0.9\linewidth}
+    \includegraphics[width=\textwidth]{sego_aponte_figs/sego-aponte-figure7.PNG}
+    \caption{}\label{fig:sego:kon-betadel:vir}
+    \end{subfigure}
+    \caption{sensitivity analysis on the viral binding affinity constant ($k_{on}$), and the immune system delay constant ($\beta_{delay}$). \ref{fig:sego:kon-betadel:pop}) . Adapted from~\cite{sego_modular_2020}.}\label{fig:sego:kon-betadel}
+    % Fig 5. Sensitivity analysis of the number of uninfected epithelial cells vs time for variations in virus-receptor association affinity kon and immune response delay coefficient βdelay, showing regions with distinct infection dynamics.
+
+% Logarithmic pairwise parameter sweep of the virus-receptor association affinity kon and the immune response delay βdelay (×0.01,× 0.1,× 1,× 10,× 100) around their baseline values, with ten simulation replicas per parameter set (all other parameters have their baseline values as given in Table 1). The number of uninfected epithelial cells for each simulation replica for each parameter set, plotted on a logarithmic scale, vs time displayed in minutes. See Fig 4 for the definitions of the classes of infection dynamics.
+\end{figure}
+
+
+\section{Sego-Aponte-Gianlupi Discussion}\label{sec:sego-aponte:dis}
+
+In the Sego-Aponte-Gianlupi model we were able to include several aspects of primary airway infection. We matched our simulation results to data available at the time. Our simulation predicted different outcomes for the infection and which parameters moved the simulation outcomes from one result to the other. We were also able to create a preliminary implementation of possible antiviral treatments.
+
+The modularity of the framework was a success. We showed in the Sego-Aponte-Gianlupi paper~\cite{sego_modular_2020} that we can easily swap the viral infection model to model hepatitis instead of SARS-CoV-2. The framework also showed its flexibility in subsequent works, such as my Remdesivir model~\cite{ferrari_gianlupi_multiscale_2022}, and Aponte \textit{et al.}'s plaque growth dynamics model~\cite{aponte-serrano_multicellular_2021}.
+
+Although out implementation is flexible and easily modifiable, it is still limited to one modeling framework, CompuCell3D. In Chapters~\ref{cha:phenocell} and~\ref{cha:translator}, I explain my efforts into methods that either are general to many frameworks, or to convert a model made for one framework to another.
+

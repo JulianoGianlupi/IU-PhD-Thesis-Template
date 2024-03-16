@@ -1,0 +1,63 @@
+\chapter{Discussion}\label{cha:disc}
+
+. I've helped the field with my cross-platform work, my translator serves as a proof of concept that it is possible to create a unified model specification for ABMs, simmilarly to what is done for population dynamics, metabolic networks, cell signaling pathways, pharmacological models, \textit{etc.}, through SBML~\cite{hucka_systems_2003}. This discussion chapter aims to provide a overview of the findings, explore their significance, and discuss their implications in the context of the broader field of research.
+
+Firstly, it is crucial to highlight the major findings of my research. The results obtained from the developed agent-based models elucidated the complex dynamics of COVID-19 at the cellular level, offering valuable insights into the interplay between viral infection, immune response, and treatment interventions. The models effectively captured the spatial and temporal dynamics of viral spread within cell populations and what are key parameters that can explain the variability of patient outcomes in a, naive, first infection with SARS-CoV-2 (see Chapter~\ref{cha:sego-aponte}). I also successfully integrated more traditional PK-PD/PBPK models with our COVID-19 model, and indicated which questions this combination can ask that a pure  PK-PD/PBPK cannot (Chapter~\ref{cha:remdes}). In particular, "what are the effects of cell individuality and heterogeneity on a pro-drug treatment?" I also posed some possible sources of cell individuality, \textit{e.g.}, cell age, cell distance from capillaries. Exploring these possible sources and their precise effect can help future drug development.
+
+The outcomes of these studies have significant implications for both the field of computational biology and the understanding of COVID-19 dynamics. By developing mechanistic models that integrate cellular behaviors, microenvironmental factors (\textit{e.g.}, cell heterogeneity), and treatment interventions, this research contributes to a more comprehensive understanding of the disease. The insights gained from these models can inform evidence-based decision-making in the development of therapeutic strategies, public health interventions, and drug discovery efforts.
+
+% The comparison and cross-platform validation of the agent-based models between the Cellular Potts and center-based methodologies yielded promising results. The translation process successfully transferred the fundamental components of the models, while preserving key model behaviors. 
+
+% biological characteristics. More work is needed to improve the translation process validate the translated models. 
+
+% The successful translation of agent-based models between different computational frameworks not only facilitates collaboration among researchers but also promotes model reproducibility and shareability. This highlights the potential for the wider adoption and application of mechanistic modeling approaches in addressing various health-related challenges.
+
+My \pscs to \ccds translation software is successful.  The translation process successfully transferred the fundamental components of the models, while preserving key model behaviors. It showed what will be the difficult areas for a hypothetical general modeling specification for ABMs, both predicted areas and new ones. For instance, concepts that exist in one platform but not in the other (phenotypes), differences in scale limits, run time differences.
+
+% The work on the cross-platform interoperability recently has been funded through an NSF grant. My work in the translation process will be paramount for their success.
+
+\pcps successfully implements phenotype models in a way that can be widely adopted and is easy to use. As it is a Python package it can be imported by any other Python software, and there are established methods to interface with Python from other programming languages. After we make \pscs available as a conda package we expect it will see widespread adoption. \pscs will also make models more generaly available cross-platform, as a phenotype defined using \pcps for one particular model can be imediatly used in other models in any Python-supporting platform.
+
+
+In conclusion, my Ph.D. work has demonstrated the effectiveness of agent-based models in elucidating the mechanistic underpinnings of COVID-19 and anti-viral treatments. The cross-platform translation and validation of these models have paved the way for enhanced collaboration, model interoperability, and knowledge exchange within the scientific community. The findings contribute to the growing body of research on computational biology and provide a foundation for future investigations into the modeling of human health and disease that will eventually be a human-health digital twin.
+
+\section{Other Infrastructure Work}
+My work making bio-ABM more available and shareable began before building the translator and \pcp. Since the start of my Ph.D. I have been involved with nanoHUB. nanoHUB is an online platform that provides access to a wide range of nanotechnology-related resources and tools. It is a collaborative effort that aims to facilitate research, education, and collaboration in the field of nanotechnology. nanoHUB provides a platform for researchers to share their work, users can upload and publish their own tools, resources, and research findings, fostering knowledge exchange and collaboration. This is specially useful for journal publication of models. Instead of asking the referees and reader to download your model and the software it runs in, you can deploy the model online and link to it from the publication. nanoHUB is also useful as an educational tool, educational demos can be hosted there and used in the classroom. 
+
+More precisely, I am involved with 
+nanoBIO, nanoBIO is a project that aims to extend nanoHUB from being just about nanotechnology to also include biological models. I have helped the deployment of \ccds on nanoHUB, and I built a helper script that helps prepare a \ccds model for deployment on nanoHUB~\cite{gianlupi_script_2022} 
+(see online: \url{https://github.com/JulianoGianlupi/cc3d-nanoHub-tool-maker}), as well as a template for the deployment of tellurium~\cite{choi_tellurium_2018} models~\cite{gianlupi_getting_2021-1} (see online: \url{https://github.com/JulianoGianlupi/tellurium-nanohub-base}). I have deployed 17 educational tools~\cite{ferrari_gianlupi_compucell3d_2023, ferrari_gianlupi_compucell3d_2022, ferrari_gianlupi_compucell3d_2019, ferrari_gianlupi_compucell3d_2023-1, ferrari_gianlupi_compucell3d_2019-1, ferrari_gianlupi_compucell3d_2020, ferrari_gianlupi_covid-19_2021, ferrari_gianlupi_compucell3d_2021, ferrari_gianlupi_focalpointplasticity_2021, ferrari_gianlupi_cancer_2021, sego_covid_2020, ferrari_gianlupi_compucell3d_2020-1, ferrari_gianlupi_compucell3d_2020-2, ferrari_gianlupi_compucell3d_2020-3, ferrari_gianlupi_compucell3d_2020-4, ferrari_gianlupi_compucell3d_2020-5, ferrari_gianlupi_compucell3d_2023-2, gianlupi_getting_2021-1}.
+
+\section{Future work}\label{sec:disc:future}
+
+\subsection{Translator}\label{sec:disc:future:trans}
+
+As mentioned, James Glazier and Paul Macklin were awarded a NSF POSE grant to build a standardized ecosystem for virtual tissue modeling. My efforts in building a translator will play a pivotal role in the success of this effort. I've pointed out areas that will be a challenge and addressed some of them. These challenging areas will most likely continue to be difficult when addressing other platforms beyond \ccds and \psc. I believe the main areas of difficulty won't be related to forces or how behaviors are defined, but on concepts that one framework has an the other doesn't. In my work translating \pscs into \ccds this was the phenotypes, this was such a big hurdle that it became its own project (\pcp).
+
+Near future developments for the translator will focus on finding an adequate form for the cell-cell contact energy in \ccds that reproduces the adhesion-repulsion forces of \psc. Another area of focus will be on improving cell movement in the translated simulation (\textit{i.e.}, implementing a version of \psc's bias), and translating the initial cell layout used by \psc.
+
+% Open VT - A Standardized Ecosystem for Virtual Tissue
+
+\subsection{\pcp}\label{sec:disc:future:pheno}
+
+\pcps is a promising Python package that will help computational biologists build ABMs for cellular systems. To make its adoption easy the next step in its development is creating a Conda or pip distribution package for \pcp. That will make \pcp a part of the user's python environment and importing it will be the same as importing any other python package (\textit{e.g.}, NumPy).
+
+Next we will focus on more robust API features, coordinating the embedded \pcps model with the main model will be easier and faster. The API will also make the integration of \pcps with other modeling platforms beyond \ccds and TissueForge straight forwards.
+
+
+% \begin{itemize}\setlength\itemsep{.01em}
+%     \item Interface (API) classes for CompuCell3D and Tissue Forge
+%     \item Template interface classes
+%     \item Automatic inter-cell heterogeneity~\cite{ferrari_gianlupi_multiscale_2022}
+%     \item Randomization of the initial Phase of the Phenotype
+%     \item Conda or pip distribution
+%     \item API for environment interaction (\textit{e.g.}, detection of oxygen levels in the environment, detection of neigboring cells)
+%     \item "Super-Phenotypes," phenotypes made from more than one Phenotype class, and methods for switching between them
+% \end{itemize}
+
+\subsection{My Future Post-Doctoral Research}
+Besides continuing the development of \pcps and advising on the ABM definition standard, I will begging a new research line with Dr. Amber Smith at UTHSC. 
+
+I will work on building models of pneumococcus pneumonia infection. How the pneumococci bacteria avoid detection by the immune system, change phenotype, how the disease progresses, and so on. 
+
+

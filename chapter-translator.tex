@@ -1,0 +1,1715 @@
+\chapter{Translating model specifications}\label{cha:translator}
+
+\section{Introduction}\label{sec:trans:intro}
+
+
+We build biological models to describe and investigate biological systems. Our models need to follow the scientific method, where we start from an observation about a natural phenomenon or problem, formulate a clear and specific question, create a tentative and testable hypothesis, make a prediction, and perform experiments (in our case, our experiment is \textit{in silico}, \textit{i.e.}, the model itself) to test the hypothesis. After doing the experiments we can analyse the results, compare them with wet-lab experiments (if they exist), come to a conclusion, suggest new wet-lab experiments, and publish our model and results. 
+
+After publication, it would be ideal if the model is reproduced using another method, after all, the modeler's choice of which platform and method to use in their investigation, if we assume the model is build correctly, should not change the results from the model. In fact, one way to check the validity of a model is to re-implement it on a platform that utilizes a different method to represent biology. Replication and reproduction are one of the most important parts of the scientific method, they guaranty the falsifiability of the experiment and hypothesis.
+
+Do multicellular tissue agent-based models (ABMs) follow the scientific method fully? Science and computational models should be: \textbf{f}indable, \textbf{a}ccessible, \textbf{i}nteroperable, and \textbf{r}eusable (\textbf{fair})~\cite{wilkinson_fair_2016}. Tissue ABMs usually follow the first two criteria, but do not follow the later two. \textit{E.g.}, a PhysiCell~\cite{ghaffarizadeh_physicell_2018} model cannot be reused in CompuCell3D~\cite{swat_multi-scale_2012}. This is a result of the fact that, currently, there's no easy and unified method to use a biological agent-based models (ABMs) developed for one platform in another. 
+
+The lack of interoperability and reusability slows down research and inhibits collaboration, and causes a crisis of reproducibility. Theses issues could be mitigated by re-implementing a model by hand. However, re-implementing a model is a time intensive task that requires deep knowledge of the model and both platforms, therefore, it is rarely done. How can we change that?
+
+Developing automated, standardized, methods to use ABMs in multiple platforms would make re-using and validating such models cross-platform trivial. There are two ways such cross-platforms methods could work: a new universal specification standard, or model translators. The advantages of the new standard are that there is a clean slate for its development and definitions, it can be designed to be expressive, consistent and efficient, it is independent of target platforms, new platforms can adapt themselves to it, only one needs to be developed. The disadvantages are that it must be developed from scratch (there are no pre-built representations of cells, dynamics, \textit{etc.}), until a platform adopts the standard it doesn't have a purpose, there's no pre-existing constituency of models built for it, and there are many unknowns regarding it. The advantages of translating are that it immediately has utility, and there are existing models that can be used with the translator, a target community for the translator exists. The disadvantages are that one new translator has to be made for each pair of modeling platforms, the translator has to deal with the idiosyncrasies of each platform. 
+
+To develop the translators or the universal specification
+several challenges need to be overcome. Some, such as how to implement universal concepts, how to deal with different scales and number of agents the platforms can simulate at once, what to do about concepts that existing only in some platforms, are common to both methods. As the universal ABM specification is more general, it will probably face more challenges and require more extensive development. To explore some of the challenges such an endeavor will encounter I've developed a translator, which is more straightforward to accomplish than a universal model specification for ABMs, to go from a \psc~\cite{ghaffarizadeh_physicell_2018} simulation to a \ccd~\cite{swat_multi-scale_2012} simulation.
+
+% Developing a ABM specification standard, similar to Systems Biology Markup Language (SBML)~\cite{hucka_systems_2003}, would make the process of re-runing a model in multiple platforms trivial. 
+
+% the development of a standard similar to Systems Biology Markup Language (SBML)~\cite{hucka_systems_2003} for agent-based models (ABMs) is imperative to facilitate model sharing and validation across different contexts.
+
+% \textcolor{red}{TODO: add something like "the biology is the same therefore the same model should be usable in different platforms and the results shouldn't change. reuse, validation.... Also rework the 1st sentence of the seciton.}
+
+% \textcolor{red}{Add in something like "there are two ways of doing this, new universal language or language translators. new language is advantageous because you start clean, can be designed to be expressive, consistent and efficient. independent of target platforms, new platforms can adapt themselves to it, only need 1. disadvantage is that you have to start from scratch, until somebody adopts it it is useless, no pre-existent constituency for it. 
+% Translating, immediately have utility, immediately have repository of models, disadvantage need a new translator for each pair of platforms, and have to deal with the idiosyncrasies of each platform (it is not clean). It is harder than it look to develop something like this, I'm going with the second option to understand the challenges."}
+
+% The establishment of a modeling description standard that can be universally adopted by various frameworks and modeling methods remains a challenging task, it is not clear how creating one would work. 
+% The diverse approaches employed by different frameworks, such as CompuCell3D (CC3D)~\cite{swat_multi-scale_2012}, PhysiCell~\cite{ghaffarizadeh_physicell_2018}, Morpheus~\cite{starrus_morpheus_2014}, cellular automata (CA) models~\cite{wolfram1983cellular}, \textit{etc},  in modeling biological systems, encompass distinct representations, expectations, and definitions of biological aspects, such as pixelated grids in CC3D, spherical cells in PhysiCell, and simple automatons in CA. Despite these variations, the development of a standard similar to Systems Biology Markup Language (SBML)~\cite{hucka_systems_2003} for agent-based models (ABMs) is imperative to facilitate model sharing and validation across different contexts.
+
+
+% To explore the challenges of building such a hypothetical model definition standard, I created a translator for converting the model specification files of PhysiCell~\cite{ghaffarizadeh_physicell_2018} into a simulation compatible with CompuCell3D~\cite{swat_multi-scale_2012}. 
+
+The rationale behind choosing \pscs and \ccds is threefold: first, as mentioned, it allows for early identification and assessment of the challenges associated with developing a future standard specification; second, the cell representation and dynamics in these platforms differs greatly, making their combination a good target to uncover difficulties that would stay hidden with the translation of more similar models;
+% uch as pixelated grids in CC3D, spherical cells in PhysiCell
+% given the stark differences between the two model styles; 
+third, the PhysiCell model specification is mostly done in a single XML file (as of version 1.10.4), while the CompuCell3D model specification requires distribution across three files. \ccds simulations use one XML file that is responsible for the initial configuration of the simulation (simulation size, initial conditions, initial placement of cells, model component inclusion -- \textit{e.g.,} chemotaxis), one Python file containing the custom user-defined code that should be executed each time-step (which can be separated into several "Steppable" classes), and finally a second Python file that registers the steppables classes.
+
+% To begin the process of creating this hypothetical model definition standard I decided to attempt to create a translator for PhysiCell's~\cite{ghaffarizadeh_physicell_2018} model specification file into a CompuCell3D~\cite{swat_multi-scale_2012} simulation. I made this choice because the two model styles are so different (meaning I would see the challenges of the future standard specification early), and because the model specification in PhysiCell is contained in a single XML file (as of PhysiCell version 1.10.4), whereas in CompuCell3D the model specification is spread out among one XML file and a Python file.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{.7\textwidth}
+        \includegraphics[width=\textwidth]{figures/translator/psc.png}
+        \caption{}\label{fig:trans:model-vis:psc}
+    \end{subfigure}
+    % \label{fig:my_label}
+    \begin{subfigure}{.7\textwidth}
+        \includegraphics[width=\textwidth]{figures/translator/cc3d.png}
+        \caption{}\label{fig:trans:model-vis:cc3d}
+    \end{subfigure}
+    \caption{Example GUI of a running simulation in: \ref{fig:trans:model-vis:psc}) \pscs and \ref{fig:trans:model-vis:cc3d}) \ccd. Both figures show the a simulation that was translated using the methods described here: biorobots, see Section~\ref{sec:trans:examples:biorobots}.}
+    \label{fig:trans:model-vis}
+\end{figure}
+
+
+% \begin{figure}[H]%[!htbp]
+%     \centering
+%     \includegraphics{figures/exampleFigure.png}
+%     \caption{How a tissue simulation looks in \ccds and \psc. \textcolor{red}{SHOW GUI FOR THEM WITH A SIM RUNNING Use a translated sim?}}
+%     \label{fig:trans:model-vis}
+% \end{figure}
+
+
+% \section{Differences of a CompuCell3D style model to a PhysiCell style model}\label{sec:trans:dif}
+\section{Conceptual model differences between \ccds and \pscs models}\label{sec:trans:dif}
+
+ % PhysiCell and CompuCell3D have been widely used in the field of computational biology and have their own strengths and limitations. The way they represent reality is very different from one another. In \ccds the dynamics of the simulation are driven by energy minimization~\cite{graner1992simulation}, in \pscs the dynamics are driven by forces~\cite{ghaffarizadeh_physicell_2018}. \ccds uses a lattice to represent the simulation domain, cells occupy and are made of more than one lattice site. \pscs is off-lattice, cells are spheres of varying radius. 
+
+ PhysiCell and CompuCell3D have been widely utilized in the field of computational biology, each with their own distinct strengths and limitations. One fundamental difference between these frameworks lies in their representation of the simulated domain and cells. CompuCell3D's models are Cellular Potts Models (CPM)~\cite{graner1992simulation,glazier2007magnetization}, a lattice-based approach where the dynamics of the simulation are driven by energy minimization~\cite{graner1992simulation, swat_multi-scale_2012}, while PhysiCell uses an off-lattice approach where the dynamics are driven by forces~\cite{ghaffarizadeh_physicell_2018}. Moreover, in CompuCell3D, cells are represented as collections of pixels or voxels in a lattice structure, whereas in PhysiCell, cells are represented as spheres with varying radii. Table~\ref{tab:trans:cc3d-psc-diffs} shows a few conceptual differences of \ccds and \psc.
+ 
+ % Because of this difference in how to represent the simulated domain and cells a \ccds simulation tends to represent a smaller volume and have fewer cells than a \pscs simulation. However, a \ccds simulation can represent the shape of cells and complex/arbitrary structures they may create (\textit{e.g.}, renal tubule~\cite{belmonte_virtual-tissue_2016}), as cells are spheres in \pscs they can't have arbitrary shapes and representing complex structures is more difficult. 
+
+ This difference in representation has implications for the volume of simulation and the ability to represent complex structures. CompuCell3D simulations typically represent smaller volumes and fewer cells compared to PhysiCell simulations. However, CompuCell3D is capable of representing arbitrary shapes and complex structures that cells may form, such as renal tubules~\cite{belmonte_virtual-tissue_2016}. In contrast, due to the use of spherical cells in PhysiCell, representing arbitrary shapes and complex structures is more challenging.
+
+ % Simulation specification also differs greatly between the two. As mentioned, \pscs mainly uses a single XML file to determine the model (as of version 1.10.4), and it has a robust model creation wizard to help initializing the model, the model options that can be done in XML are robust. Further model customization is possible, but less usual than in \ccds, as it has to be done in C++ \pscs has less helper functions to achieve repetitive tasks. As \ccd's simulations are expected to be customized in Python the XML options are less complete, but a \ccds simulation tends to be more flexible.
+
+ The specification of simulations also differs significantly between the two frameworks. As mentioned, in \pscs most of the model definition happens in a single XML file (as of version 1.10.4). \psc's XML file specification is comprehensive and allows in depth customization of model components and cell behavior. However, further model customization in PhysiCell is harder, as it requires C++ programming and lacks some helper functions for repetitive tasks. 
+ % PhysiCell utilizes a single XML file for model specification (as of version 1.10.4), with a model creation wizard to aid in initialization. However, further model customization in PhysiCell is less common as it requires C++ programming and lacks some helper functions for repetitive tasks. 
+ On the other hand, CompuCell3D simulations are expected to be customized using Python, and while the XML options may be less comprehensive, the framework offers greater flexibility. Both platforms have model-creation wizards that aid in model generation.%, \psc's wizards is more advanced insofar as
+
+ % Both platforms support diffusing field modeling. These fields can be used to represent chemical species, concentrations of virus, and concentrations in general. The diffusion solver for \pscs is more advanced than \ccd's and quite faster. Cells in both platforms can interact with the diffusing fields in a diverse set of ways. They can uptake or secrete to them, chemotax on their gradient, use the concentration they are exposed to/absorbed as controls for cell behaviors, and so on.
+
+ Both PhysiCell and CompuCell3D support modeling diffusing field, which can represent chemical species, virus concentrations, and other concentrations. However, the diffusion solver in PhysiCell is more advanced and faster compared to CompuCell3D. \ccds uses a forward Euler solver~\cite{swat_multi-scale_2012}, while \pscs uses BioFVM~\cite{ghaffarizadeh_physicell_2018, ghaffarizadeh_biofvm_2016}.
+ % (it utilizes BioFVM~\cite{ghaffarizadeh_biofvm_2016} to solve diffusion). 
+ Cells in both frameworks can interact with diffusing fields in various ways, including uptake or secretion, chemotaxis, and using the concentration as a control for cell behaviors.
+
+
+
+One notable feature of PhysiCell is its integrated module for cell behavior simulations and changes in behaviors, known as phenotypes. They can represent the cell cycle, stages of cell death, a latent/active state of bacteria, \textit{etc.}, see Chapter~\ref{cha:phenocell} for more information on phenotypes. This module is comprehensive and sophisticated, providing extensive capabilities for modeling cell behaviors in response to the microenvironment. In contrast, CompuCell3D lacks a built-in cell behavior model of this complexity and modelers are expected to create their own. The phenotype submodel in PhysiCell is complex to the point of requiring a separate project to re-implement it in a form that \ccds can use. 
+
+Such an elegant representation of cell behaviors should not be restricted to one or two modeling platforms. It can be used in, and would strengthen, any bio-ABM. Therefore, I turned my Python implementation of \psc's phenotypes into a stand-alone Python package called PhenoCellPy. \pcps is discussed in detail in Chapter~\ref{cha:phenocell} and in a separate publication~\cite{gianlupi_phenocellpy_2023}.
+
+% to the bio-modeling comunity in general
+
+% Having such an elegant representation of sequences of cell behaviors generally available to the bio-modeling community 
+
+% As it can be useful in any cell agent-based behavior framework I turned it in a Python package called PhenoCellPy, \textcolor{red}{TODO: improve}
+
+% which is discussed in detail in Chapter~\ref{cha:phenocell} and in a separate publication~\cite{gianlupi_phenocellpy_2023}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \subsection{Differences of Object Representation in \ccds and \psc}
+% \textcolor{red}{TODO}
+
+% Please add the following required packages to your document preamble:
+% \usepackage{graphicx}
+\begin{table}[H]%[!htbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{c|cc}
+Concept               & CompuCell3D       & PhysiCell                 \\ \hline
+Cell shape            & Fundamental, complex       & Derived, simple \\
+Cell shape anisotropy & Fundamental       & Missing                   \\
+Cell center of mass   & Derived           & Fundamental               \\
+Cell velocity         & Derived           & Fundamental               \\
+Basic cell behavior   & Fundamental       & Fundamental               \\
+Complex cell behavior & User-defined only & Fundamental/user-defined  \\
+% Cell Morphology       & Fundamental       & Spherical only               \\
+Cell types            & Fundamental       & Fundamental               \\
+Movement bias	      & Derived           &	Fundamental               \\
+Cell compartments     & Fundamental       & Missing
+\end{tabular}%
+}
+\caption{Comparison of selected concepts from CompuCell3D and PhysiCell}
+\label{tab:trans:cc3d-psc-diffs}
+\end{table}
+
+\section{An Overview of the Dynamics of \ccds and \psc}
+\input{translator-extra-files/dynamics-overview}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Implementation of the Translation Process}\label{sec:trans:impl}
+
+The PhysiCell to \ccds translator works by first transforming \psc's XML file into a Python dictionary using a Python package called "xmltodict" (\url{https://pypi.org/project/xmltodict/}). Then several functions and methods are used to parse and re-implement the available 
+% re-implement the parsed 
+information in a \ccds compliant way.  After the simulation is reinterpreted the new \ccds files are placed in a folder respecting the file structure \ccds expects.
+
+\subsection{Translating Space}\label{sec:trans:impl:space}
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{xml}
+<overall>
+    <max_time units="min">30240</max_time> 
+    <time_units>min</time_units>
+    <space_units>micron</space_units>
+    <dt_diffusion units="min">0.01</dt_diffusion>
+    <dt_mechanics units="min">0.1</dt_mechanics>
+    <dt_phenotype units="min">6</dt_phenotype>	
+</overall>
+\end{minted}
+\caption{Example \pscs XML defining the time and space units and time discretization constants}\label{code:trans:physi:time}
+\end{listing}
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{xml}
+<domain>
+    <x_min>-750</x_min>
+    <x_max>750</x_max>
+    <y_min>-750</y_min>
+    <y_max>750</y_max>
+    <z_min>-750</z_min>
+    <z_max>750</z_max>
+    <dx>20</dx>
+    <dy>20</dy>
+    <dz>20</dz>
+    <use_2D>false</use_2D>
+</domain>
+\end{minted}
+\caption{Example \pscs XML defining the simulated domain and space discretization constants}\label{code:trans:physi:space}
+\end{listing}
+
+
+
+The first information to be extracted is the space domain size, if the simulation is 3D or 2D, and which length unit \pscs has set for length (micrometer, nanometer, \textit{etc}). Listing~\ref{code:trans:physi:time} and~\ref{code:trans:physi:space} show example \pscs XML for defining the domain space and units respectively. It should be noted that the position of the origin within the simulation domain differs in both platforms. Specifically, PhysiCell's origin is located at the center of the domain and, as a result, has negative coordinates, while CompuCell3D's origin is positioned at a corner of the simulated domain and only has positive coordinates.
+
+% \pscs and \ccds set the origin of the simulation at different positions of the simulated domain, \pscs sets the origin of the simulation axis to the center of the domain (and, therefore has negative coordinates). \ccds sets the origin of the simulation to be a corner of the simulated domain and only has positives coordinates. 
+
+% The present study seeks to establish a comparison between PhysiCell and CompuCell3D, which are widely used computational biology tools. To this end, the spatial properties of both models are analyzed, and the length units used in PhysiCell are identified. It should be noted that the position of the origin within the simulation domain differs in both platforms. Specifically, PhysiCell's origin is located at the center of the domain and, as a result, has negative coordinates, while CompuCell3D's origin is positioned at a corner of the simulated domain and only has positive coordinates.
+
+% Although \pscs is off-lattice, it still has a space discretization constant that is also extracted. With the whole simulation size, \psc's space discretization we can define how many pixels the \ccds simulation will have. Each side of the \ccds simulation is:
+
+Despite being an off-lattice model, PhysiCell adopts a space discretization constant that must also be extracted. This value, along with the simulation size, is used to determine the number of pixels in the CompuCell3D simulation. Specifically, the size of each side of the CompuCell3D simulation (i.e., x, y, and z) is calculated using the following formula:
+
+\begin{equation}\label{eq:trans:set-sim-size}
+    \Delta X^{cc3d}_i = \frac{\Delta X^{psc}_i}{\delta X^{psc}}\,\,.
+\end{equation}
+
+% \noindent With the $i$ subscript denoting each of the sides of the simulation (x, y, z), $\Delta D^{cc3d}_i$ the size (in pixels) of the side $i$ of the \ccds simulation, $\Delta D^{psc}_i$ the size (in the units used) of the side $i$ of the \pscs simulation, and $\delta D^{psc}$ the discretization of space in \psc. 
+
+% As $\delta D^{psc}$ discretizes space, it must have units of [space-unit/discrete-unit]. To respect the space units set by \pscs the translator defines a pixel unit using $\delta D^{psc}$, one pixel in \ccds is set to:
+
+Here, $\Delta X^{cc3d}_i$ represents the size (in pixels) of the $i$-th side of the CompuCell3D simulation, $\Delta X^{psc}_i$ indicates the size (in the corresponding units) of the $i$-th side of the PhysiCell simulation, and $\delta X^{psc}$ denotes the discretization of space in PhysiCell. If the \pscs simulation is 2D the translator will set the z dimension in \ccds to be 1 pixel wide (the standard method of implementing 2D simulations in \ccd). As $\delta X^{psc}$ discretizes space, it must have units of [space-unit/discrete-unit]. To ensure consistency with the length units used in PhysiCell, the translator defines the pixel unit in \ccds as:
+
+% \begin{equation}\label{eq:trans:px-space-unit}
+%     1\,\text{pixel} = \text{space-unit}/\delta D^{psc}\,\,. 
+% \end{equation}
+
+\begin{subequations}\label{eq:trans:px-space-unit}
+    \begin{equation}\label{eq:trans:px-space-unit:!}
+        \text{CC3D-space-unit} = \frac{\Delta X^{cc3d}_x}{\Delta X^{psc}_x} \rightarrow \left[\frac{\text{pixel}}{\text{space-unit}}\right]\,\,,
+    \end{equation}
+    \begin{equation}\label{eq:trans:px-space-unit:2}
+        \frac{\Delta X^{cc3d}_x}{\Delta X^{psc}_x} = 1/\delta X^{psc}\,\,,
+    \end{equation}
+    \begin{equation}\label{eq:trans:px-space-unit:3}
+        1\,\text{pixel} = \text{space-unit}/\delta X^{psc}\,\,.
+    \end{equation}
+\end{subequations}
+
+\noindent Appendix~\ref{appendix:trans:dim-conv} shows the Python function that does this process.
+
+% As cells in \ccds are made of several pixels they clearly have a minimum size of 1 pixel. Small cells in \ccds have a tendency to separate into fragments of disappear from the simulation entirely (their volume goes to zero and they cease to exist), therefore the minimum practical volume for a \ccds cell is greater than a single pixel. When doing the conversion of space with Equation~\ref{eq:trans:set-sim-size} and Appendix~\ref{appendix:trans:dim-conv} this practical aspect is not respected, naively respecting the simulation specifications from \pscs results in cells in \ccds that have $<1\,pixel$.
+
+In CompuCell3D, a cell is represented by a group of multiple pixels, which imposes a minimum size of 1 pixel for the cell. However, it is worth noting that small cells in CompuCell3D have a tendency to fragment or completely disappear from the simulation due to their small size and energy minimization, thereby necessitating a practical minimum volume for CompuCell3D cells greater than a single pixel. Unfortunately, when converting space from PhysiCell to CompuCell3D using the methods described by Equation~\ref{eq:trans:set-sim-size} and Appendix~\ref{appendix:trans:dim-conv}, cell volumes tend to be $<1$ pixel.
+
+% Naively adhering to the simulation specifications from PhysiCell in the conversion process results in CompuCell3D cells with volumes smaller than 1 pixel. 
+To respect the minimum practical size, the translator stretches the dimensions for \ccds if any cell is below a minimum pixel volume (set to 8 pixels as default). This stretching process is described in Section~\ref{sec:trans:chal:space}.
+
+\subsection{Translating Time}\label{sec:trans:impl:time}
+Next, the translator extracts information about time. What are the time units used (seconds, minutes, hours, \textit{etc}), how long the simulation should run for, and what is the discretization of time ($dt$). As seen in Listing~~\ref{code:trans:physi:time}, \pscs actually has three $dt$s defined, one for the diffusion solver, one for the mechanics solver, and one for the phenotype solver. \pscs uses this method to optimize simulation run time~\cite{ghaffarizadeh_physicell_2018} by only calling each solver when it is needed.
+% it optimizes calls to each solver in \pscs. 
+% \textit{E.g.}, if the diffusion time-step is set to $dt_{dif}=0.01$, the mechanics to $dt_{mech}=0.1$, and the phenotype $dt_{pheno}=5$, the diffusion solver is called 10 times for every mechanics solver, and the mechanics solver is called 50 times for every phenotype solver. % This distribution of time-steps is typical in \psc, as diffusion solvers are typically the most unstable, mechanical solvers less so, and the phenotype models in \pscs are usually stable.
+
+\ccds only has one time-step, the Monte-Carlo Step (MCS), which is always set to 1~\cite{swat_multi-scale_2012}. To deal with diffusion instabilities, \ccds sub-steps the diffusion solvers depending on the diffusion constants set. As \ccds doesn't have the phenotype models it doesn't need a phenotype time-step. My \pcp~\cite{gianlupi_phenocellpy_2023} package (see Chapter~\ref{cha:phenocell}) uses SciPy's ODE solvers~\cite{2020SciPy-NMeth} to deal with instabilities. Considering that the time-step in \ccds is only equivalent to the mechanics time-step in \psc, the translator only extracts it. 
+
+We want both simulations to represent the same amount of time. As $dt$ is fixed to 1 in \ccd, the number of steps the converted \ccds simulation will have is:
+
+\begin{equation}\label{eq:trans:time:steps}
+    \Delta\tau^{cc3d} = \Delta\tau^{psc}/dt^{psc}_{mech} \,\,.
+\end{equation}
+
+\noindent Where $\Delta\tau^{cc3d}$ is the total of time-steps in \ccd, $\Delta\tau^{psc}$ is the total amount of \textit{time} (not time-steps) from the \pscs simulation, and $dt^{psc}_{mech}$ the mechanical time-step in \psc.
+The translator defines the time-step units in \ccds (MCS's units) as:
+\begin{subequations}\label{eq:trans:time:unit}
+    \begin{equation}\label{eq:trans:time:unit:1}
+        \text{CC3D-time-unit} = \frac{\Delta\tau^{cc3d}}{\Delta\tau^{psc}} \rightarrow \left[\frac{\text{MCS}}{\text{time-unit}}\right]\,\,,
+    \end{equation}
+    \begin{equation}\label{eq:trans:time:unit:2}
+        \frac{\Delta\tau^{cc3d}}{\Delta\tau^{psc}} = 1/dt^{psc}_{mech}\,\,,
+    \end{equation}
+    \begin{equation}\label{eq:trans:time:unit:3}
+        1\,\text{MCS} = \text{time-unit} / dt^{psc}_{mech}
+    \end{equation}
+\end{subequations}
+\noindent Appendix~\ref{appendix:trans:time-conv} shows the Python function that does this process.
+
+% Just as the conversion of space leads to issues, this conversion will lead to issues with the diffusion solvers in \ccd. 
+This conversion leads to very high diffusion constants, which slows down \ccd's diffusion solvers a lot (\ccd's diffusion solvers are not as sophisticated as \psc's). How the translator mitigates this issue is described in Section~\ref{sec:trans:chal:time}.
+
+
+\subsection{Extracting Cell Types and Constraints}\label{sec:trans:impl:constraints}
+
+
+% Now that time and space have been converted and we have its conversion factors we can extract the cell types used in \pscs and start to translate cell constraints. Extracting cell type names is straight forwards, as all cell type names are under the same XML tag. Cell constraints are divided among mechanics, custom, and phenotype. Secretion and uptake of diffusing elements is a sub-part of the phenotype data.
+The present section discusses the process of extracting information about cell types and constraints in the PhysiCell-CompuCell3D translation pipeline. The first step in this process involves the extraction of cell types from \psc's XML. Subsequently, the translator extracts the values associated with mechanics, custom data, and phenotype constraints. The translator converts extracted units to pixels/MCSs, using the conversion factors for time and space that were previously calculated in Equation~\ref{eq:trans:px-space-unit} and~\ref{eq:trans:time:unit}. Appendix~\ref{appendix:trans:cell-types-conv} shows the functions that do the cell type and mechanics extraction.
+
+% The translator loops over \psc's cell constraints XML, converts the values with units to pixels/MCSs and saves all that data to a Python dictionary that is used later to generate \ccd's simulation files. The first cell information extracted is cell volume, if it's pixel volume is below the minimum practical volume (set to eight pixels by default) a flag is set with the cell dictionary to later on correct the conversion (correction described in Section~\ref{sec:trans:chal:space}). 
+The translator then loops over the cell constraints in the XML file, extracting the cell volume and cell-type name as the first pieces of information about the cells. If the pixel volume is below the minimum practical volume (default set to eight pixels), a flag is set to correct the conversion later in the process (described in Section~\ref{sec:trans:chal:space}). Following this, the mechanics constraints are extracted, including the repulsion-attraction force potential between cells, the equilibrium distance for the potential, the rate of cell adhesion molecule (CAM)~\cite{lodish2008molecular} binding and unbinding, the spring constant for these CAMs, and the maximum distance at which two cells can start forming CAMs. It should be noted that the simulation of adhesion is complex in PhysiCell and differs from the method used in CompuCell3D, which involves defining a contact energy~\cite{swat_multi-scale_2012}, and is much simpler. Due to this discrepancy, the translator does not attempt to implement a parameter translation for adhesion in its current version. A method to include this information is under investigation, see Section~\ref{sec:trans:chal:adhesion}.
+
+It should be noted that the default boundary condition for \pscs cells is periodic, to have a contained simulation \pscs uses an XML element, \\*\code{virtual\_wall\_at\_domain\_edge}. The translation uses this element to set the boundary conditions for cells in the \ccds simulation. It should be noted that since, from the point of view of the simulation and cells in the simulation, nothing exists outside the simulation domain, cells near the simulation's border will experience a zero energy with the "outside." Therefore, cells tend to stick to the borders of the simulation (as the other contact energies are $J>0$.) It is standard practice in \ccds to have a wall "cell" type to build the simulation border. This way the contact with the border can be controlled. If \code{virtual\_wall\_at\_domain\_edge} is true, \textit{i.e.}, the simulation's cell boundary condition is not periodic, the translator will create the wall "cell" type and build the wall for the simulation.
+
+% Next the other mechanics constraints are extracted. They are related to the repulsion-attraction force potential between cells, the equilibrium distance for that potential, how fast two cells make and unmake cell adhesion molecules (CAMs)~\cite{lodish2008molecular}, what's the spring constant for those CAMs, and what is the maximum distance that two \pscs cells can start forming CAMs. Adhesion in \pscs is complex, this is not the case in \ccd, in \ccds the most common method to simulate adhesion is to define a contact energy~\cite{swat_multi-scale_2012}. As the methods for simulating adhesion between cells are so different in each platform, this version of the translator does not attempt to implement a parameter translation for it.
+
+
+% Phenotype data is extracted, the translator finds out what phenotypes a cell type can show. For instance, a cancer cell will have one phenotype for while it is alive, taking it through the cell cycle, and a phenotype for when it has died. The translator prepares the phenotype data in a way that can be used by \pcp~\cite{gianlupi_phenocellpy_2023} (see Chapter~\ref{cha:phenocell}, and places it in the steppables file. The translator includes checks for the availability of \pcp, the extracted phenotype data is only used if it is.
+The phenotype data is then extracted, and the translator identifies the phenotypes that a given cell type can exhibit. For example, a cancer cell may have one phenotype while it is alive, and a different phenotype once it has died. The translator prepares the phenotype data in a format suitable for PhenoCellPy (refer to Chapter~\ref{cha:phenocell}), and includes checks for the availability of \pcp.
+
+
+ As chemotaxis in \pscs merely biases the cell velocity while in \ccds it will change the cell speed the translator, the only information the translation extracts is which cell-types chemotax on which fields and if they chemotax up the gradient or down the gradient.
+% Finally, custom cell parameters. They can be related to a miriad of things, and their use is model specific. For these reasons they are saved to the cells but are not used by the translator. Section~\ref{sec:trans:gen:step} goes over how this information is made available.
+Lastly, custom cell parameters are extracted. These parameters are model-specific and can be related to a variety of factors. Although they are made available,  the translator does not use them. Section~\ref{sec:trans:gen:step} provides further details on how this information is made available.
+
+\subsection{Extracting Diffusing Elements}\label{sec:trans:impl:dif}
+% The diffusing elements get translated after the conversion of space is corrected (see Section~\ref{sec:trans:chal:space}), as that correction changes the value of the diffusion constant. The process of extracting the diffusing elements is similar to extracting cell type data. 
+
+The translation of diffusing elements in CompuCell3D is performed subsequent to the correction of space conversion (as explained in Section~\ref{sec:trans:chal:space}), since the space correction modifies how much space each pixel represents, and, therefore, changes the diffusion constant. The process of extracting diffusing elements is similar to that of extracting cell type data. The translator reads the corresponding XML tag, determines the number of diffusing elements, and converts the diffusion parameters. A sample XML for a diffusing element is presented in Listing~\ref{code:trans:physi:diff-elemt}. In Listing~\ref{code:trans:physi:diff-elemt}, we can see that \pscs sets units for the concentration of diffusing elements. These units, however, are not used for anything in \psc. Therefore, the translator ignores concentration units and treats all of them as arbitrary units (AU).
+\begin{listing}[H]%[!htbp]
+    \begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{xml}
+<variable name="oxygen" units="mmHg" ID="0">
+    <physical_parameter_set>
+        <diffusion_coefficient units="micron^2/min">
+            100000
+        </diffusion_coefficient>
+        <decay_rate units="1/min">0.1</decay_rate>  
+    </physical_parameter_set>
+    <initial_condition units="mmHg">38</initial_condition>
+    <Dirichlet_boundary_condition units="mmHg" enabled="true">
+        38
+    </Dirichlet_boundary_condition>
+</variable>        
+    \end{minted}
+    \caption{Example \pscs XML for a diffusing element}\label{code:trans:physi:diff-elemt}
+\end{listing}
+
+% The translator reads the relevant XML tag, defines how many diffusing elements there are, and converts the diffusion parameters. An example XML for a diffusing element can be found in Listing~\ref{code:trans:physi:diff-elemt}. The diffusion constant (D) has units of [space$^2$/time], taking that into account and Equations~\ref{eq:trans:px-space-unit} and~\ref{eq:trans:time:unit} the conversion of D from the value set by \pscs to a value usable by \ccds follows:
+
+The diffusion constant, denoted by D, has units of [space$^2$/time]. Considering Equations~\ref{eq:trans:px-space-unit} and~\ref{eq:trans:time:unit} and accounting for units, the conversion of D from its value specified in PhysiCell to a value that can be used in CompuCell3D is given by:
+\begin{equation}\label{eq:trans:diff-const}
+    D^{cc3d} = D^{psc} \times \frac{dt^{psc}_{mech}}{(\delta X^{psc})^2}\,\,.
+\end{equation}
+% \noindent Where $D^{cc3d}$ is the diffusion constant for \ccd, with [pixel$^2$/MCS] as units, and $D^{psc}$ the diffusion constant in \psc. The decay constant for diffusion has units of [1/time], following the same process as for the diffusion constant, we have:
+\noindent Here, $D^{cc3d}$ is the diffusion constant for CompuCell3D with [pixel$^2$/MCS] as units, and $D^{psc}$ is the diffusion constant in PhysiCell. The decay constant for diffusion has units of [1/time]. Consequently, with similar considerations, we have:
+\begin{equation}\label{eq:trans:decay-const}
+    \gamma^{cc3d} = \gamma^{psc} \times dt^{psc}_{mech}\,\,.
+\end{equation}
+\noindent Where $\gamma^{cc3d}$ is the decay constant for \ccd, with [1/MCS] as units, and $\gamma^{psc}$ the decay constant in \psc.
+
+As mentioned, if the diffusion constants are high, \ccd's diffusion solver requires extra calls for each time-step to avoid numerical errors, greatly slowing the simulation. The translator mitigates some of this issue by setting diffusing fields with high diffusion constants ($D^{cc3d}>1000\,pixel^2/MCS$ by default) to use the steady-state diffusion solver. Using the steady-state solver is a good approximation for very high $D^{cc3d}$s, but not for medium levels of $D^{cc3d}$. To deal with medium-high $D^{cc3d}$s (any $ D^{cc3d} \in [50, 1000) \,pixel^2/MCS$ by default)  the translator will re-parameterize the time conversion (just as low cell volumes make the translator re-parameterize space), this process is described in Section~\ref{sec:trans:chal:time}. 
+
+% The diffusion solver in CompuCell3D necessitates additional calls during each time-step to evade numerical errors if the diffusion constants are high, resulting in a significant reduction in simulation speed. To mitigate this issue, the translator sets diffusing fields with high diffusion constants ($D^{cc3d}>1000\,pixel^2/MCS$ by default) to use the steady-state diffusion solver. Using the steady-state solver is a reasonable approximation for very high $D^{cc3d}$, but not for medium levels of $D^{cc3d}$. To handle medium-high $D^{cc3d}$s (any $D^{cc3d} \in  [50, 1000)\, pixel^2/MCS$ by default), the translator re-parameterizes the time conversion (similar to how low cell volumes necessitate re-parameterization of space), as described in Section~\ref{sec:trans:chal:time}.
+
+% Besides converting the diffusion parameters, the translator also extract information about the diffusing fields boundary conditions, and their initial condition.
+Apart from converting the diffusion parameters, the translator also extracts information regarding the boundary conditions and initial conditions of diffusing fields.
+
+\subsection{Secretion and Uptake}\label{sec:trans:impl:sec-upt}
+
+This software performs the translation of secretion and uptake rates by cells of diffusing elements after it re-scales the time conversion (see Section~\ref{sec:trans:chal:time}), as that re-scaling would change the values of these rates. 
+
+\pscs has a concept of proportional-secretion~\cite{ghaffarizadeh_physicell_2018}, which \ccds does not. Proportional secretion changes the secretion rate of the cell based on how much concentration of diffusing material is already near the cell. It is: 
+\begin{equation}\label{eq:trans:net-sec}
+    s_{net}(\sigma) = r_s \times \left(c_{tg}(\sigma) - c(\sigma) \right) + s_{base}(\sigma)\,\,.
+\end{equation}
+\noindent Where $s_{net}(\sigma)$ is the net secretion by cell $\sigma$ for a particular diffusing element, $r_s$ is the concentration based secretion rate of that diffusing element, $c_{tg}(\sigma)$ the target concentration at which the proportional secretion will cease for cell $\sigma$, and $s_{base}(\sigma)$ an independent secretion rate for cell $\sigma$ that does not cease. 
+It should be noted that $s_{net}\geq0$.
+Even though \ccds does not have a similar concept to \psc's proportional secretion, it is straight forward to implement in \ccd using simple Python operations. Section~\ref{sec:trans:gen:step:sec} shows how this is implemented for \ccd.
+
+Uptake, in contrast, is simple. The cells remove a fraction of the diffusing element that is near them at each time-step. \textit{I.e.},
+\begin{equation}\label{eq:trans:net-up}
+    u(\sigma) = r_u \times c(\sigma)\,\,.
+\end{equation}
+\noindent It must be noted that $r_u\leq1$ to avoid numerical errors.
+
+As the units of secretion/uptake are proportional to $\left[1/time\right]$ and the concentration unit is not translated at all, the translation of the rates is similar to the translation of the decay rate, 
+\begin{equation}\label{eq:trans:sec-upt}
+    r^{cc3d}_i = dt^{psc}_{mech} \times r^{psc}_i\,\,.
+\end{equation}
+\noindent Where $r_i$ are the secretion/uptake rates (Equation~\ref{eq:trans:net-sec} and~\ref{eq:trans:net-up}) or the base secretion rate ($s_{base}$, Equation~\ref{eq:trans:net-sec}). Appendix~\ref{appendix:trans:sec-up} shows the function responsible for the secretion and uptake rates change.
+
+\section{Challenges}\label{sec:trans:chal}
+The translation process undertaken in this study has identified several challenges previously anticipated as well as revealed novel issues. While some problems such as small cells have been successfully addressed (as outlined in Section~\ref{sec:trans:chal:space}), the problem of translating adhesion remains unresolved. Another newly identified issue is high diffusion constants (see Section~\ref{sec:trans:impl:dif}), the translator alleviates this issue through the implementation of a steady-state diffusion solver for diffusing fields with very high diffusion constants (see Section~\ref{sec:trans:impl:dif}). For medium to high values of the diffusion constant, the translator re-parameterizes the time conversion process (see Section~\ref{sec:trans:chal:time}).
+
+The interpretation of phenotypes, their reimplementation in Python, and improved usability and customization was a major aspect of this project. In fact, this process became so significant that it evolved into a separate project, PhenoCellPy, which is described in Chapter~\ref{cha:phenocell}.
+
+\subsection{Appropriate Cell and Simulation Domain Sizes}\label{sec:trans:chal:space}
+Section~\ref{sec:trans:impl:space} points out that the straight forward methods for translating space may lead to cells with $<1$ pixel in \ccd. To address this issue, a series of functions were implemented to stretch the simulated domain so that the smallest cell volume met the minimum requirement of 8 pixels (this minimum can be changed when running the translator). This was accomplished by expanding the cell volumes and spatial dimensions based on a calculation using the minimum allowable pixel volume, 
+\begin{subequations}\label{eq:trans:expand}
+\begin{equation}\label{eq:trans:expand:ratio}
+    r_V = \left\lceil\frac{\nu^{cc3d}_{px}}{\min\{V^{cc3d}_{px}(\sigma)\}}\right\rceil\,\,,
+\end{equation}
+\begin{equation}\label{eq:trans:expand:new-side}
+    \Delta X'^{\,\,cc3d}_i = r_V \times \Delta X^{cc3d}_i\,\,.
+\end{equation}
+\end{subequations}
+\noindent Where $r_V$ is the expansion ratio, $V^{cc3d}_{px}(\sigma)$ are the cell volumes in pixels, $\{V^{cc3d}_{px}(\sigma)\}$ the set of cell volumes, $\min$ the operation to get the minimum value of a set, $\nu^{cc3d}_{px}$ the minimum pixel volume the cells are allowed to have, $\lceil\,\,\rceil$ the ceiling (\textit{i.e.}, round up) operation, $\Delta X^{cc3d}_i$ the previously determined simulation domain sides, and $\Delta X'^{\,\,cc3d}_i$ the expanded simulation domain sides. If the simulation is 2D, the translator does not change the z dimension from 1. This change implies a change to the units of the pixel (\textit{i.e.}, how many $\mu m$/$m$/\textit{etc.} it represents).
+Listings~\ref{code:trans:recon-space}, \ref{code:trans:recon-space:dims}, and~\ref{code:trans:recon-space:vol} show the functions that perform this operation.
+
+% If the translator detects any cell volume below the minimum (default 8 pixels) it will call a series of functions to stretch the simulated domain so that the smallest cell has that minimum volume (see Listings~\ref{code:trans:recon-space}, \ref{code:trans:recon-space:dims}, and~\ref{code:trans:recon-space:vol}). Those functions expand the cell volumes and spatial dimensions based on the following calculation: 
+
+% \begin{equation}\label{eq:trans:expand:ratio}
+%     r_V = \left\lceil\frac{\nu^{cc3d}_{px}}{\min\{V^{cc3d}_{px}(\sigma)\}}\right\rceil\,\,.
+% \end{equation}
+
+% \noindent Where $r_V$ is the expansion ratio, $V^{cc3d}_{px}(\sigma)$ are the cell volumes in pixels, $\{V^{cc3d}_{px}(\sigma)\}$ the set of cell volumes, $\min$ the operation to get the minimum value of a set, $\nu^{cc3d}_{px}$ the minimum pixel volume the cells are allowed to have, and $\lceil\,\,\rceil$ the ceiling (\textit{i.e.}, round up) operation. The pixel volumes and simulation domain sides are increased by multiplying them by $r_V$. \textit{I.e.,}
+% \begin{equation}\label{eq:trans:expand:new-side}
+%     \Delta X'^{\,\,cc3d}_i = r_V \times \Delta X^{cc3d}_i\,\,.
+% \end{equation}
+
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def reconvert_spatial_parameters_with_minimum_cell_volume(constraints, 
+                                ccdims, pixel_volumes, minimum_volume):
+    """
+    Parameters:
+    -----------
+        constraints : dict
+            The previously converted dictionary of cell constraints
+        ccdims : tupple
+            A tuple of the previously converted cc3d space parameters
+        pixel_volumes : list
+            A list of volumes of cells in pixels
+        minimum_volume : int
+            The minimum volume required for the cell in pixels
+    Returns:
+        - Tuple[Tuple, Dict]: A tuple containing the converted `ccdims` 
+            and `constraints`.
+    """
+    px_vols = [px for px in pixel_volumes if px is not None]
+    minimum_converted_volume = min(px_vols)
+    reconvert_ratio = ceil(minimum_volume / minimum_converted_volume)
+    ccdims = reconvert_cc3d_dims(ccdims, reconvert_ratio)
+    constraints = reconvert_cell_volume_constraints(constraints, 
+                            reconvert_ratio, minimum_volume)
+    return ccdims, constraints
+\end{minted}
+\caption{Function to reconvert spatial parameters based on the smallest cell volume, calls the functions in Listings~\ref{code:trans:recon-space:dims}, and~\ref{code:trans:recon-space:vol}. Defines what is the scaling ratio based on $\lceil\frac{\text{min}(V^{cc3d}_{px}(\sigma))}{\nu^{cc3d}_{px}}\rceil$, where $V^{cc3d}_{px}(\sigma)$ is the list of cell volumes in pixels and $\nu^{cc3d}_{px}$ the minimum volume in pixels the cells are allowed to have.}\label{code:trans:recon-space}
+\end{listing}
+
+
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def reconvert_cc3d_dims(ccdims, ratio):
+    """
+    Parameters:
+    -----------
+        ccdims : tuple
+            A tuple containing the number of pixels in each dimension 
+            of a 3D domain, the pixel -- real unit relationship,
+            and the pixel -- real unit ratio.
+        ratio : int
+            The ratio to multiply the number of pixels in each dimension 
+            by.
+    Returns:
+    --------
+        tuple: A new tuple containing the updated number of pixels in 
+              each dimension, the updated pixel -- real unit 
+              relationship, and the updated pixel -- real unit ratio.
+    """
+    ccdims = list(ccdims)
+    number_pixels = [ratio * ccdims[0], ratio * ccdims[1], 
+                        ratio * ccdims[2]]
+    old_pixel_unit_ratio = ccdims[-2]
+    # pixel` = ratio*pixel = ratio * conv * unit
+    new_pixel_unit_ratio = ratio * old_pixel_unit_ratio
+    new_string = ccdims[3].replace(str(old_pixel_unit_ratio), 
+                    str(new_pixel_unit_ratio))
+    new_ccdims = (number_pixels[0], number_pixels[1], number_pixels[2], 
+                    new_string, new_pixel_unit_ratio, ccdims[-1])
+    return new_ccdims
+\end{minted}
+\caption{Function to re-set the simulation domain sides ($\Delta X^{cc3d}_i$ in Equation~\ref{eq:trans:set-sim-size}), and pixel units (Equation~\ref{eq:trans:px-space-unit}), based on the ratio ($r_V$) defined by the function in Listing~\ref{code:trans:recon-space}.}\label{code:trans:recon-space:dims}
+\end{listing}
+
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def reconvert_cell_volume_constraints(con_dict, ratio, minimum_volume):
+    """
+    Parameters
+    ----------
+    con_dict : dict
+       Dictionary of constraints to be converted.
+       Each key in the dictionary corresponds to a type of constraint,
+       and its value is a dictionary with keys like 'volume', 'surface', 
+       etc.
+    ratio : int
+       The ratio between the old voxel size and the new voxel size.
+       All volume constraints are multiplied by this factor.
+    minimum_volume : int
+       The minimum value to replace any None values in the 'volume' key.
+    Returns
+    -------
+    dict
+       A new dictionary of constraints, where the 'volume' key values
+       have been converted to the new voxel size, and any None values
+       have been replaced with the `minimum_volume`.
+    """
+    new_con = {}
+    for ctype, const in con_dict.items():
+        new_con[ctype] = const
+        if const['volume']["volume (pixels)"] is None:
+            new_con[ctype]['volume']["volume (pixels)"] = minimum_volume
+        else:
+            new_con[ctype]['volume']["volume (pixels)"] = ratio * \
+                                    const['volume']["volume (pixels)"]
+    return new_con
+\end{minted}
+\caption{Function that increases the cell volumes (in pixels) based on the ratio ($r_V$) defined by the function in Listing~\ref{code:trans:recon-space}. This function loops over the cell types in the constraint dictionary and does the multiplication. If any cell does not have a volume (in pixels) set this function will default its volume to the minimum volume $\nu^{cc3d}_{px}$.}\label{code:trans:recon-space:vol}
+\end{listing}
+
+However, this solution presented a new problem: the expanded simulation domain became too large, with the potential to exceed $2^{64}$ pixels, causing a numerical overflow. Even when that hard limit is not reached, memory use becomes an issue quickly. A $1500 \times 1500 \times 1500$ lattice, for instance, would require, at a minimum, approximately 27GB of RAM due to pixel memory use. Each pixel in CompuCell3D uses 8 bytes for each type of data shown, i.e., the cell field pixels will each use 8 bytes, then each diffusing field pixel will each also use 8 bytes, and so on.
+
+To address this issue, the translation process truncates the simulation domain to limit the simulation size. By default, no simulation can have more than $V^{cc3d}_{max} = 3,375,000$ pixels ($150^3$ pixels). The function that performs the truncation process (see Listing~\ref{code:trans:trunc-space}) takes the previously expanded CompuCell3D dimensions (\textit{i.e.}, the results from Equation~\ref{eq:trans:expand}) and the maximum simulation domain volume as arguments.  If the domain size doesn’t exceed the maximum, the function doesn’t perform any operations. If the maximum volume is exceeded and all the sides are the same, the function sets the sides to $X_{default} = \lceil (V^{cc3d}_{max})^{1/3}\rfloor$ ($\lceil \,\rfloor$ is the operation that rounds to the nearest integer). If the sides are not the same, the translator calculates the average domain side ($\left<\Delta X\right>$), each side's proportion to the average ($P_i$), and sets the new side to be the default simulation side ($X_{default}$) times the respective proportion. In other words,
+
+% To address this issue, the translation process was constrained by imposing limits on the simulation size. Specifically, a default maximum of 3,375,000 pixels (150^3 pixels) was established, as detailed in Listing 7. Unfortunately, this limitation precludes the easy adaptation of initial conditions defined in PhysiCell, and may result in some simulations being incomplete due to domain truncation.
+
+% This operation solves the cell volume issue, however, it creates a new problem the simulation domain becomes too big. Simulation domains can easily go over $2^{64}$ pixels, which would require a computer with 128-bit architecture to handle. A first approach would be to cut off the simulation size when it reaches $2^{64}$ pixels, that is not enough, however. Each pixel in \ccds uses 8 bytes, but this amount is for each type of data shown, \textit{i.e.}, the cell field pixels will each use 8 bytes, then each diffusing field pixel will each also use 8 bytes, and so on. For instance, a $1500\times1500\times1500$ lattice would require $1500\times1500\times1500\times8 bytes \approx 27 GB$ of RAM at a minimum.
+
+% Therefore, the translation process imposes a limit on simulation size. Unfortunately, it can't do a process of shrinking the simulation, as that would just bring back cells that are too small. The way the simulation is limited is by truncating the simulation domain, by default no simulation can have more than $V^{cc3d}_{max} = 3,375,000$ pixels ($150^3$ pixels). This does mean that the initial conditions defined in \pscs can't be easily adapted, and that some simulations will not have important parts of its domain represented.
+
+% The function that does the truncation process is in Listing~\ref{code:trans:trunc-space}. It takes the \ccds dimensions and the maximum volume as arguments. If the domain size doesn't exceed the maximum this function doesn't perform any operations. If the maximum volume is exceeded and all the sides are the same, the function sets the sides to $X_{default} = \lceil\sqrt[3]{V^{cc3d}_{max}}\rfloor$ ($\lceil \,\rfloor$ is the operation that rounds to the nearest integer). If the sides are not the same, the translator calculates the average domain side ($\left<\Delta X\right>$), what is each side's proportion to the average ($P_i$), and sets the new side to be the default simulation side ($X_{default}$) times the respective proportion. In other words,
+\begin{subequations}\label{eq:trans:truncate}
+    \begin{equation}\label{eq:trans:truncate:avg}
+        \left<\Delta X\right> = \frac{1}{3} \sum_{i=1}^{3} \Delta X'^{\,\,cc3d}_i
+    \end{equation}
+    \begin{equation}\label{eq:trans:truncate:prop}
+        P_i = \frac{\Delta X'^{\,\,cc3d}_i}{\left<\Delta X\right>}
+    \end{equation}
+    \begin{equation}\label{eq:trans:truncate:new-side}
+        \Delta X''^{\,\,cc3d}_i = \left\lfloor P_i \times X_{default} \right\rfloor
+    \end{equation}
+\end{subequations}
+\noindent Where $\Delta X'^{\,\,cc3d}_i$ are the increased simulation sides (see Equation~\ref{eq:trans:expand:new-side}), $\lfloor\,\,\rfloor$ the floor (\textit{i.e.}, round down) operator, and $\Delta X''^{\,\,cc3d}_i$ are the truncated simulation sides. 
+
+It's worth noting that this approach does mean that the initial conditions defined in PhysiCell can't be easily adapted, and that some simulations may not have important parts of their domain represented.
+
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def decrease_domain(ccdims, max_volume=150 ** 3):
+    """
+    Parameters:
+    -----------
+        ccdims : tuple
+            tuple of 6 elements containing information about the 3D 
+            domain
+        max_volume : int
+            maximum allowed volume of the domain in pixels. Default is 
+            150^3 pixels.
+    Returns:
+        new_dims: tuple
+            typle of 6 elements containing the new dimensions of the 
+            domain,
+            after decreasing its size if necessary.
+        truncated : bool
+            indicates whether the domain was truncated. If True, 
+            a warning message is issued.
+    """
+    default_side = round(max_volume ** (1 / 3))
+    old_dims = [ccdims[0], ccdims[1], ccdims[2]]
+    old_volume = ccdims[0] * ccdims[1] * ccdims[2]
+    if old_volume < max_volume:
+        return ccdims, False
+    if old_dims[0] == old_dims[1] == old_dims[2]:
+        new_dims = [default_side, default_side, default_side]
+    else:
+        med_s = sum(old_dims) / len(old_dims)
+        proportions = [d / med_s for d in old_dims]
+        new_dims = [int(default_side * p) for p in proportions]
+    new_dims.extend([ccdims[3], ccdims[4], ccdims[5]])
+    message = f"WARNING: Converted dimensions of simulation domain"\
+              f" totaled > {default_side}**3 pixels. \nWe have " \
+              f"truncated " \
+              f"the sides of the simulation.This may break the "\
+              "initial conditions as defined in " \
+              f"PhysiCell.\nOld dimensions:{ccdims[0:3]}\nNew "\
+              f"dimensions:{new_dims[0:3]}"
+    warnings.warn(message)
+    return new_dims, True
+\end{minted}
+\caption{Function that truncates the simulation domain sides if necessary. If the current simulation volume does not exceed the maximum volume allowed this function simply returns the dimensions as are and a flag stating that no change was performed. Otherwise, it performs the operations described in Equation~\ref{eq:trans:truncate}, and returns the new dimensions and a flag stating that they were truncated.}\label{code:trans:trunc-space}
+\end{listing}
+
+\subsection{Appropriate Diffusion Parameters}\label{sec:trans:chal:time}
+Sections~\ref{sec:trans:impl:time} and~\ref{sec:trans:impl:dif} state that the time and diffusion parameter translations will lead to diffusion constants ($D$) that are very high, causing several extra calls to \ccd's diffusion solvers and, consequently, a considerable simulation slow down. Some of the extra calls, and slow down, is mitigated by approximating the diffusion process with the steady-state solution, as described in Section~\ref{sec:trans:impl:dif}.
+
+As we need to decrease the number of extra calls to the diffusion solver we have to make the amount of time each time-step represents smaller, and proportionally increase the total number of time-steps the simulation will perform. In other words, to achieve a more general solution, the translation process reduces the time unit in \ccd, \textit{i.e.}, the amount of minutes/hours/\textit{etc.} each MCS represent is decreased. 
+
+The translator reduces the diffusion constants in a similar fashion to the cell volume increase. By determining if any (non-steady-state) $D$s are above a maximum ($D_{max} = 50 pixel^2/MCS$ by default), finding what is the ratio of $D_{max}$ to the biggest diffusion constant, and reducing all diffusion parameters by that ratio. The translator rounds the ratio to the 2 most significant digits before the reduction process. \textit{I.e.},
+\begin{subequations}\label{eq:trans:diff-dec}
+    \begin{equation}\label{eq:trans:diff-dec:ratio}
+        r_D = \left\lceil \frac{D_{max}}{\max\{D^{nss}_i\}} \right\rfloor_2\,\,,
+    \end{equation}
+    \begin{equation}\label{eq:trans:diff-dec:mult}
+        D'_i = r_D \times D_i\,\,.
+    \end{equation}
+\end{subequations}
+\noindent Where $\{D^{nss}_i\}$ is the set of diffusion constants ($D^{nss}_i$) that have not been set to use the steady-state solver, $\lceil\,\,\rfloor_2$ the operator to round to the 2 most significant digits, and $D'_i$ the re-scaled diffusion constants. It's important to note that although only the non-steady-state diffusion constants ($D^{nss}_i$) are used to determine $r_D$, all diffusion constants ($D_i$) are re-scaled. 
+
+The other parameters that have time in their units also need re-scaling. To reduce the number of operations most of the translation happens after the re-scaling steps (\textit{e.g.}, translation of secretion/uptake rates). Therefore, the only other parameter that needs re-scaling at this point is the decay rates ($\gamma_i$) of the diffusing elements. The process is the same as the one shown in Equation~\ref{eq:trans:diff-dec:mult}, 
+\begin{equation}
+    \gamma'_i = r_D \times \gamma_i\,\,.
+\end{equation}
+\noindent Where $\gamma'_i$ are the re-scaled decay constants. 
+
+The function that performs the time, diffusion, and decay constants re-scaling is in Appendix~\ref{code:trans:recon-time}.
+
+\subsection{Cell-Cell Adhesion \& Repulsion Implementation}\label{sec:trans:chal:adhesion}
+
+Cell-Cell adhesion and repulsion in \pscs have a complex functional form (see Equations~\ref{eq:abm:physi-ad-pot} and~\ref{eq:abm:physi-rep-pot}), \ccd's contact energy can't replicate them. 
+Even though the translator extracts all the relevant information about \psc's adhesion and repulsion forces, they are not used. Instead the translator defaults to using the regular CPM adhesion energy with contact energy constants (\textit{i.e.}, $J(\sigma, \sigma')$) set to 10, see Section~\ref{sec:trans:gen:xml:contact-energy}.
+% Therefore, the translator defaults the cell-cell contact energies to $10 A.U.$.
+
+\ccd, however, has another, more complex, form of adhesion: Adhesion Flex~\cite{compucell3d_reference}. We are currently investigating how to use adhesion flex in a way that conforms to \psc's adhesion and repulsion forces, it will replace the first energy term in the Halmiltonian shown in Equation~\ref{eq:abm:cpm-hamiltonian}. Adhesion Flex is more flexible than the regular contact energy in a few ways. While the regular contact energy is defined in a cell-type pair basis adhesion flex can be cell on a individual cell basis. And, more importantly, it can have an arbitrary functional form. The adhesion flex contact energy is 
+
+\begin{equation}\label{eq:trans:cc3d:adhesion-flex}
+\mH_{adhesion-flex} = \sum_{i}\sum_{j_v} \left(- \sum_m \sum_n k_{mn} F\left(N_m (i), N_n(j) \right) \right)\left(1 - \delta(\sigma_i, \sigma_j) \right)\,\,.
+\end{equation}
+
+\noindent The first two sums, as in Equation~\ref{eq:abm:cpm-hamiltonian}, are over all the pixels of the simulated domain ($i$), and $i$'s neighboring pixels ($j_v$). The internal sums (\textit{i.e.}, $\sum_m \sum_n k_{mn} F\left(N_m (i), N_n(j) \right)$) is the contact energy between cells $\sigma_i$ and $\sigma_j$, $m$ and $n$ are indices for the adhesion molecules expressed by $\sigma_i$ and $\sigma_j$, $F\left(N_m (i), N_n(j) \right)$ is a user-defined function of the number of molecules $n$ and $m$ of cells $\sigma_i$ and $\sigma_j$, and $k_{mn}$ is a scaling factor for the user-defined function $F$. As before, the Kronecker delta guarantees that a cell will not have a contact energy with itself. 
+
+By integrating \psc's adhesion and repulsion forces and combining them together we can find an equivalent form for $F\left(N_m (i), N_n(j) \right)$, we need to be careful about how we translate the continuous maximum range from \pscs to a discrete range fit for \ccd. 
+
+
+\subsection{CPM Limitation on Cell Speed}\label{sec:trans:chal:speed}
+As cells move pixel by pixel in CPM, there effectively is a maximum speed they can migrate with~\cite{szabo2013cellular}. Typically, the center of mass of a CPM cell will not move more than $0.25\sim0.5$ pixel/MCS. This fact is not considered by the translator when scaling the value of the pixel and of MCS in the translated simulation, which means that cells in the translated simulation may move more slowly than they should if the original \pscs was to be respected. Respecting both the speed of the original cells and the original diffusion parameters is a challenge that requires future work.
+
+% \subsection{Phenotypes}\label{sec:trans:chal:pheno}
+
+
+\section{Generating the \ccds Simulation}\label{sec:trans:gen}
+
+% Once all the information about the \pscs simulation is converted to units that can be used by \ccd, and the conversion issues have been mitigated the files for \ccds can be generated. The translator begins by the XML file, which is responsible for setting several global parameters (\textit{e.g.}, the diffusion and decay constants for diffusing elements, the cell types) and loading model plugins (if, for instance, the secretion plugin is not loaded there can't be any secretion or uptake in the simulation).
+
+After the conversion of all the relevant information from the original PhysiCell simulation to a form that can be utilized by CompuCell3D and the mitigation of any conversion issues, the files for CompuCell3D can be produced. The process of generating the files commences with the XML file. The XML file sets the cell types, diffusing fields (and associated constants and boundary conditions), and loads model plugins (\textit{e.g.}, energies in the model's Hamiltonian, different monitors and trackers, cell secretion and uptake).
+% which assumes responsibility for configuring various global parameters, such as the constants associated with the diffusion and decay of diffusing elements, the different cell types, and the loading of model plugins. 
+Plugins need to be loaded into \ccds explicitly in order to have its capabilities available. For instance, if the volume plugin is not loaded cells can't have a target volume that they will tend towards, if the secretion plugin is not loaded the simulation can't perform secretion or uptake, and so on.
+
+Complex behavior is defined through Python classes called "steppables" (named after "time-\textbf{steps}"). The Python file containing the steppables is the first thing generated after the XML. Finally, the translator creates and intermediary Python file that registers the steppable classes with \ccd.
+
+% The translator places the generated \ccds simulation in a folder set by the user. If the user doesn't set a folder, the translator will create a folder named "\textit{CC3D\_converted\_sim}" in the same directory the original \pscs XML file is, and place the translated simulation there.
+
+% After the conversion of all the relevant information from the original PhysiCell simulation to a form that can be utilized by CompuCell3D and the mitigation of any conversion issues, the files for CompuCell3D can be produced. The process of generating the files commences with the XML file, which assumes responsibility for configuring various global parameters, such as the constants associated with the diffusion and decay of diffusing elements, the different cell types, and the loading of model plugins. It is noteworthy that if certain plugins, such as the secretion plugin, are not loaded, the simulation will be unable to facilitate secretion or uptake.
+
+Upon completion of the simulation generation process, the translated CompuCell3D simulation is stored in a folder as specified by the user. In the event that no folder is specified, the translator creates a folder labeled "\textit{CC3D\_converted\_sim}" in the same directory where the initial PhysiCell XML file is located and saves the translated simulation in this folder.
+
+\subsection{Creating the XML file}\label{sec:trans:gen:xml}
+
+\subsubsection{Cell Types}\label{sec:trans:gen:xml:cell-types}
+The translator begins the generation of the XML by creating the cell types tag. It is generated with the extraction of cell types and constraints, described in Section~\ref{sec:trans:impl:constraints}. The code that shows how this is done is in Appendix~\ref{appendix:trans:cell-types-conv}. Listing~\ref{code:trans:cc3d:xml:cell-type} shows a typical cell types XML tag. \ccds can set the cells to never 
+% move 
+change its constituent pixels
+by adding the "freeze" statement in a specific cell type tag, this is specially useful for the wall "cell".
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+% %bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{xml}
+<Plugin Name="CellType">
+	<CellType TypeId="0" TypeName="Medium"/>
+	<CellType TypeId="1" TypeName="cancer_cell"/>
+	<CellType TypeId="2" TypeName="immune_cell"/>
+	<CellType Freeze="" TypeId="3" TypeName="WALL"/>
+</Plugin>
+\end{minted}
+\caption{Typical cell type XML tag for \ccd.}\label{code:trans:cc3d:xml:cell-type}
+\end{listing}
+
+\subsubsection{Simulation Domain and Boundary Conditions}\label{sec:trans:gen:xml:potts}
+Next the \textit{$<$Potts$>$} tag is generated, this tag sets the domain size, temperature of the simulation (see~\cite{swat_multi-scale_2012} for a definition of temperature in Cellular Potts Models), total number of time-steps the simulation does, and if the boundary conditions for the cells is periodic. 
+As mentioned in Section~\ref{sec:abm:cpm-history}, the CPM algorithm will select two pixels, the second is picked from a Von Neumann neighborhood with a set range of the first. This range is defined by the "\textit{NeighborOrder}" element in the Potts tag. This range/neighbor order is separate from the contact energy neighborhood range.
+% In \ccds the cell moves pixel-by-pixel (several times per time-step)~\cite{swat_multi-scale_2012}, how far a pixel change can happen is defined by the "\textit{NeighborOrder}" element in the Potts tag. 
+Listing~\ref{code:trans:cc3d:potts} shows a typical \ccds Potts tag.
+
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{xml}
+<Potts>
+   <Dimensions x="150" y="150" z="150"/>
+   <Steps>1000</Steps>
+   <Temperature>10.0</Temperature>
+   <NeighborOrder>1</NeighborOrder>
+   <!-- <Boundary_x>Periodic</Boundary_x> -->
+   <!-- <Boundary_y>Periodic</Boundary_y> -->
+</Potts>
+\end{minted}
+\caption{Typical Potts XML tag for \ccd.}\label{code:trans:cc3d:potts}
+\end{listing}
+
+The translator adds custom tags to the Potts block regarding the relationship of pixel to real units and MCS to real units, namely \textit{$<$Space\_Units$>$}, \textit{$<$Pixel\_to\_Space$>$}, \textit{$<$Time\_Units$>$}, and \textit{$<$MCS\_to\_Time$>$}. They name what is used as the space unit (\textit{e.g.}, $\mu m/nm/etc$), how much space each pixel represents, what is used as the time unit ($days$ $/h/minutes$$/etc$), and how much time each MCS represents, respectively. It also adds a few comments about the translation process. Listing~\ref{code:trans:cc3d:potts-generated} shows an example Potts tag generated by the translator. Listing~\ref{code:trans:cc3d:func-potts} shows the function that generates the Potts tag and the extra information that is added by the translator.
+
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+% bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{xml}
+<Potts>
+   <!-- Basic properties of CPM (GGH) algorithm -->
+   <Space_Units>1 pixel = 0.05 micron</Space_Units>
+   <Pixel_to_Space units="pixel/micron" id = "pixel_to_space">10
+   </Pixel_to_Space>
+   <Dimensions x="150" y="150" z="1"/>
+   <Time_Units>1 MCS = 10.0 min</Time_Units>
+   <MCS_to_Time units="MCS/min" id = "mcs_to_time">0.02</MCS_to_Time>
+   <Steps>14400</Steps>
+   <!-- As the frameworks of CC3D and PhysiCell are very different -->
+   <!-- PC doesn't have some concepts that CC3D does. Temperature is 
+   one of -->
+   <!-- them, so the translation script leaves its tunning as an 
+   exercise-->
+   <!-- for the reader -->
+   <Temperature>10.0</Temperature>
+   <!-- Same deal for neighbor order as for temperature-->
+   <NeighborOrder>1</NeighborOrder>
+   <!-- <Boundary_x>Periodic</Boundary_x> -->
+   <!-- <Boundary_y>Periodic</Boundary_y> -->
+</Potts>
+\end{minted}
+\caption{Translator generated Potts XML tag for \ccd.}\label{code:trans:cc3d:potts-generated}
+\end{listing}
+
+
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.1,
+% %bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def make_potts(pcdims, ccdims, pctime, cctime):
+    """
+    Parameters
+    ----------
+    pcdims : tuple
+        Tuple of infomration from PhysiCell
+    ccdims : tuple
+        Tuple of infomration from  CC3D
+    pctime : tuple
+        Tuple with the time unit from PhysiCell
+    cctime : tuple
+        Tuple with the time parameters for CC3D
+    Returns
+    -------
+    str
+        Potts XML string with the given parameters.
+    """
+    potts_str = f""" 
+<Potts>
+   <!-- Basic properties of CPM (GGH) algorithm -->
+   <Space_Units>{ccdims[3]}</Space_Units>
+   <Pixel_to_Space units="pixel/{pcdims[3]}" id = "pixel_to_space">
+        {ccdims[4]}
+   </Pixel_to_Space>
+   <Dimensions x="{ccdims[0]}" y="{ccdims[1]}" z="{ccdims[2]}"/>
+   <Time_Units>
+        {cctime[1]}
+   </Time_Units>
+   <MCS_to_Time units="MCS/{pctime[1]}" id = "mcs_to_time">
+        {cctime[2]}
+   </MCS_to_Time>
+   <Steps>{cctime[0]}</Steps>
+   <!-- As the frameworks of CC3D and PhysiCell are very different -->
+   <!-- PC doesn't have some concepts that CC3D does. Temperature is 
+   one of -->
+   <!-- them, so the translation script leaves its tunning as an 
+   exercise-->
+   <!-- for the reader -->
+   <Temperature>10.0</Temperature>
+   <!-- Same deal for neighbor order as for temperature-->
+   <NeighborOrder>1</NeighborOrder>
+   <!-- <Boundary_x>Periodic</Boundary_x> -->
+   <!-- <Boundary_y>Periodic</Boundary_y> -->
+</Potts>\n"""
+    return potts_str
+\end{minted}
+\caption{Function that generates the Potts tag for \ccd. }\label{code:trans:cc3d:func-potts}
+\end{listing}
+
+\subsubsection{Contact Energies}\label{sec:trans:gen:xml:contact-energy}
+
+% As mentioned in Section~\ref{sec:abm:apm-history:cpm}, Cellular Potts Models work by energy minimization. In particular, the contact energy uses the following functional form~\cite{swat_multi-scale_2012,graner1992simulation},
+% \ref{eq:trans:}
+From Equation~\ref{eq:abm:cpm-hamiltonian}, the standard contact energy in CPM is:
+\begin{equation}\label{eq:trans:cc3d:contact-en}
+    \mathcal{H}_{contact} = \sum_{i}\sum_{\{j\}_i} J\left(\tau(\sigma_i), \tau(\sigma_j)\right) \left(1 - \delta(\sigma_i, \sigma_j)\right)\,\,.
+\end{equation}
+
+Equation~\ref{eq:trans:cc3d:contact-en} implies that a CPM requires a contact energy matrix with size equal to the number of cell type pairs defined. As cells contact the medium they are in, it must also be included in the matrix. For these reasons, the translator begins by creating all the cell-type combinations (including a type with itself). After the combinations are created, the translator loops through them and generates a string that will be the contact energy XML tag. The translator defaults all contact energy to 10, and the contact energy range to 3. Listing~\ref{code:trans:cc3d:en-tag} containg a typical contact enegy XML tag, and Listing~\ref{code:trans:cc3d:en-func} the translator's function that generates it.
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{xml}
+<Plugin Name="Contact">
+	<Energy Type1="Medium" Type2="Medium">10.0</Energy>
+	<Energy Type1="Medium" Type2="cancer_cell">10.0</Energy>
+	<Energy Type1="Medium" Type2="immune_cell">10.0</Energy>
+	<Energy Type1="immune_cell" Type2="immune_cell">10.0</Energy>
+	<Energy Type1="cancer_cell" Type2="cancer_cell">10.0</Energy>
+	<Energy Type1="cancer_cell" Type2="immune_cell">10.0</Energy>
+	<NeighborOrder>3</NeighborOrder>
+</Plugin>
+\end{minted}
+\caption{Typical contact energy XML tag for \ccd.}\label{code:trans:cc3d:en-tag}
+\end{listing}
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.1,
+% bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def make_contact_plugin(celltypes):
+    """
+    Parameters:
+    ----------
+        celltypes : list
+            A list of strings representing the cell types in the 
+            simulation.
+    Returns:
+    -------
+        contact_plug : str
+            A string containing the configuration for the contact plugin
+    """
+    combs = list(combinations(celltypes, 2))
+    for t in celltypes:
+        combs.append((t, t))
+    combs.reverse()
+    contact_plug = """
+<Plugin Name="Contact">
+\t<!-- PhysiCell doesn't have an equivalent to this plugin. Its  -->
+\t<!-- tunning and deciding on the neighbor order is left as an -->
+\t<!-- exerise to the reader. -->
+\t<!-- A better option (to be implemented) is to use the adhesion flex 
+-->
+\t<!-- Specification of adhesion energies -->
+\t<Energy Type1="Medium" Type2="Medium">10.0</Energy>\n"""
+    # 1 make the medium contact energies
+    me = ""
+    for t in celltypes:
+        me += f'\t<Energy Type1="Medium" Type2="{t}">10.0</Energy>\n'
+    # 2 make the combination energies
+    ce = ""
+    for t1, t2 in combs:
+        ce += f'\t<Energy Type1="{t1}" Type2="{t2}">10.0</Energy>\n'
+    contact_plug += me + ce + "\t<NeighborOrder>3</NeighborOrder>\n"\
+    "</Plugin>"
+    return contact_plug
+\end{minted}
+\caption{Function that generates the contact energy tag for \ccd. }\label{code:trans:cc3d:en-func}
+\end{listing}
+
+\subsubsection{Initial Condition}\label{sec:trans:gen:xml:init}
+
+As noted in Section~\ref{sec:trans:chal:space}, the initial conditions from \pscs can't be easily adapted. Therefore the translator defaults to a simple initial condition of filling most of the simulation domain with an equal number of cells from each defined cell type placed at random. \ccds does this sort of initialization with the uniform initializer tag in the XML. Listing~\ref{code:trans:cc3d:unif-init-tag} shows a typical uniform initializer, and the translator's function that creates it is in Appendix~\ref{code:trans:recon-time}. It should be noted that the wall "cell" type is not included in this initial condition cell mix.
+
+This tag allows to define a cuboid in which the cells are placed, all cells begin as cubes, the tag also allows to define what should be the initial side-length of the cells (\textit{"$<$Width$>$"} in the tag).
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{xml}
+<Steppable Type="UniformInitializer">
+	<Region>
+		<BoxMin x="10" y="10" z="10"/>
+		<BoxMax x="140" y="140" z="140"/>
+		<Gap>0</Gap>
+		<Width>7</Width>
+		<Types>cancer_cell,immune_cell</Types>
+	</Region>
+</Steppable>
+\end{minted}
+\caption{Typical uniform initializer XML tag for \ccd.}\label{code:trans:cc3d:unif-init-tag}
+\end{listing}
+
+\subsubsection{Diffusion Plugin}\label{sec:trans:gen:xml:diff}
+As the translator sets some diffusing elements to be approximated by their steady-state solution while some are kept dynamic, it need to create two Diffusion Plugins tags in the XML for \ccds (one for each type of solver). The XML setting diffusion elements for \ccds is complex, with elements for the diffusing element name, secretion (which is redundant with the separate diffusion plugin, and the translator does not use), and boundary conditions. The translator adds more elements to report the concentration units for that diffusion element, and several comments. 
+
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.1,
+% bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{xml}
+<Steppable Type="DiffusionSolverFE">
+  <!-- Specification of PDE solvers -->
+  <DiffusionField Name="oxigen">
+     <DiffusionData>
+        <FieldName>oxigen</FieldName>
+        <GlobalDiffusionConstant>0.1</GlobalDiffusionConstant>
+        <GlobalDecayConstant>1e-05</GlobalDecayConstant>
+        <!-- Additional options are: -->
+        <!-- <InitialConcentrationExpression>x*y
+        </InitialConcentrationExpression> -->
+        <!-- <ConcentrationFileName>INITIAL CONCENTRATION FIELD - 
+        typically a file with path Simulation/NAME_OF_THE_FILE.txt
+        </ConcentrationFileName> -->
+        <DiffusionCoefficient CellType="cellA">0.1
+        </DiffusionCoefficient>
+        <DiffusionCoefficient CellType="cellB">0.1
+        </DiffusionCoefficient>
+        <DecayCoefficient CellType="cellA">0.0001</DecayCoefficient>
+        <DecayCoefficient CellType="cellB">0.0001</DecayCoefficient>
+     </DiffusionData>
+     <BoundaryConditions>
+        <Plane Axis="X">
+           <ConstantValue PlanePosition="Min" Value="10.0"/>
+           <ConstantValue PlanePosition="Max" Value="5.0"/>
+           <!-- Other options are (examples): -->
+           <!-- <Periodic/> -->
+           <!-- <ConstantDerivative PlanePosition="Min" Value="10.0"/> 
+           -->
+        </Plane>
+        <Plane Axis="Y">
+           <ConstantDerivative PlanePosition="Min" Value="10.0"/>
+           <ConstantDerivative PlanePosition="Max" Value="5.0"/>
+           <!-- Other options are (examples): -->
+           <!-- <Periodic/> -->
+           <!-- <ConstantValue PlanePosition="Min" Value="10.0"/> -->
+        </Plane>
+     </BoundaryConditions>
+  </DiffusionField>
+</Steppable>
+\end{minted}
+\caption{Typical diffusion XML tag for \ccd.}\label{code:trans:cc3d:diff-xml}
+\end{listing}
+
+\ccds allows the diffusion parameters (diffusion constant and decay constant) for each diffusing element to vary on a cell-type basis~\cite{swat_multi-scale_2012}. The translator adds comments explaining this feature, and creates the XML elements that would define this while keeping them commented out. \ccds has more options for the diffusing elements boundary conditions than \psc. In \psc, they can either be Dirichlet boundary conditions (\textit{i.e.}, with their values fixed to a constant), or "free-floating" (\textit{i.e.}, zero derivative boundary condition). \ccds is capable of simulating those, as well as non-zero derivative boundary condition, and periodic boundary conditions. Boundary conditions are set on a diffusing element basis. Listing~\ref{code:trans:cc3d:diff-xml} shows a typical XML tag for a diffusing element in \ccd. This XML is for a non-steady-state diffusing element, the only change for a steady-state element would be in the opening XML tag, from \textit{Type="DiffusionSolverFE"} to \textit{Type="SteadyStateDiffusionSolver"}.
+
+The translator's functions that generate the diffusion XML declarations are in Appendix~\ref{code:trans:diff-xml-gen}.
+
+
+\subsubsection{Secretion}\label{sec:trans:gen:xml:sec}
+As secretion from \pscs is complex, it must performed in Python for \ccd. Therefore we only need to load it in the XML. The translator detects if there is any secretion defined and, if so, it places the XML tags from Listing~\ref{code:trans:cc3d:sec-xml} in \ccd's XML to make the secretion plugin available. Section~\ref{sec:trans:gen:step:sec} shows how secretion is implemented in Python.
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.1,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{xml}
+<Plugin Name="Secretion"/>
+\end{minted}
+\caption{Secretion XML tag for \ccds to load that plugin.}\label{code:trans:cc3d:sec-xml}
+\end{listing}
+
+\subsubsection{Chemotaxis}\label{sec:trans:gen:xml:taxis}
+As chemotaxis in \ccds is usually included to the cell behavior in the steppable class, the translation only adds the necessary XML to load the chemotaxis plugin, and state which fields cells will chemotax on.
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.1,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{xml}
+<Plugin Name="Chemotaxis">
+    <ChemicalField Name="cargo_signal"/>
+    <ChemicalField Name="director_signal"/>
+</Plugin>
+\end{minted}
+\caption{Example chemotaxis XML tag for \ccds to load that plugin and define which fields cells will chemotax on.}\label{code:trans:cc3d:taxis-xml}
+\end{listing}
+
+\subsection{Creating Steppables File}\label{sec:trans:gen:step}
+With the XML file generated the translator begins the process of building the steppables file. Just as with the XML, the translator builds the steppables by 
+manipulating strings. In this case of Python commands. 
+Steppables are a special \ccds Python class that can define actions to be taken at the start of the simulation, continuously during the simulation (\textit{i.e.}, at each time-step), and at the simulation's end. This class has 
+% functions that 
+many utility functions, \textit{e.g.}, to
+list cells of a given type, to perform cell division, to do secretion and uptake by cells, \textit{etc}. Steppables are used to interact with cells and implement complex cell behavior. 
+Cell parameters and attributes, such as their type, constraints (\textit{e.g.}, target surface and target volume), custom data, can be accessed and modified in the steppables.
+
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.1,
+% bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def generate_steppable(step_name, frequency, mitosis, minimal=False, 
+        already_imports=False, additional_init=None, 
+        additional_start=None, additional_step=None, 
+        additional_finish=None, additional_on_stop=None,
+        phenocell_dir=False, user_data=""):
+    imports = steppable_imports(user_data=user_data, 
+        phenocell_dir=phenocell_dir)
+    declare = steppable_declaration(step_name, mitosis=mitosis)
+    init = steppable_init(frequency, mitosis=mitosis)
+    if additional_init is not None:
+        init = add_to_init(init, additional_init)
+    start = steppable_start()
+    if additional_start is not None:
+        start = add_to_start(start, additional_start)
+    else:
+        start += "\n\t\tpass\n"
+    step = steppable_step()
+    if additional_step is not None:
+        step = add_to_step(step, additional_step)
+    else:
+        step += "\n\t\tpass\n"
+    finish = steppable_finish()
+    if additional_finish is not None:
+        finish = add_to_finish(finish, additional_finish)
+    on_stop = steppable_on_stop()
+    if additional_on_stop is not None:
+        on_stop = add_to_on_stop(on_stop, additional_on_stop)
+    if minimal and already_imports:
+        return declare+init+start+"\n"
+    elif minimal:
+        return imports + declare + init + start + "\n"
+    elif not already_imports:
+        return imports + declare + init + start + step + finish + \
+            on_stop + "\n"
+    return declare+init+start+step+finish+on_stop+"\n"
+\end{minted}
+\caption{Generate steppable Python class master function. The later steppable-generating functions prepare each part of the steppable class and call this function to build it.}\label{code:trans:cc3d:create-steps:generate-function}
+\end{listing}
+
+While it is possible to define the simulation in a way that a single steppable class is responsible for the whole simulation, it is usual and recommended to separate the simulation in several steppable classes. %Thus, the translator creates a constraint steppable that sets cell parameters, a secretion and uptake stepabble, and a phenotype steppable.
+The translator separates the simulation into three steppable classes. A constraint initialization steppable, which sets cell constraints, initializes data and parameters, and builds the wall around the simulation. A secretion-uptake steppable, responsible for performing secretion and uptake of diffusing elements. And the phenotype steppable, it is responsible for using the phenotype submodels (implemented through \pcp), and doing cell division. Although the phenotypes are used in the phenotype steppable, they are initialized by the constraint steppable.
+
+The steppables are also capable of sharing data among them using the\\*\code{shared\_steppable\_vars} dictionary property, and cell objects in \ccds can carry their own individual data through their \code{dict} property~\cite{cc3d_python_scripting_manual}. The cell dictionary (\textit{i.e.}, the cell object's \code{dict} attribute) is specially useful, as it allows each cell to have arbitrary information associated with it. The translator uses this to, \textit{e.g.}, have the cell be responsible for its own secretion (see Section~\ref{sec:trans:gen:step:sec}).
+
+The generation of each steppable by the translator uses a helper function\\*\code{generate\_steppable}, Listing~\ref{code:trans:cc3d:create-steps:generate-function}. It begins by creating the necessary imports, \textit{i.e.}, \ccd's libraries, and the phenotype model package, \pcps (see Chapter~\ref{cha:phenocell} and~\cite{gianlupi_phenocellpy_2023}). As \pcps is a new Python package, its import is done inside a try-except block, and if it fails the translator sets a flag that will bypass all of its uses in the resulting code.
+
+Next, the function proceeds to build the steppable class name and declaration, and the steppable functions, \code{\_\_init\_\_}, \code{start}, \code{step}, \code{finish}, and \code{on\_stop}, using intermediary functions (\code{steppable\_declaration}, \code{steppable\_init}, \\*\code{steppable\_start}, \code{steppable\_step}, \code{steppable\_finish}, \\*\code{steppable\_on\_stop}) and information passed to \code{generate\_steppable} by the functions that call it. Steppables in \ccds can be called less often than at everystep, this period (called "frequency" by \ccd) can be set ona steppable class based and is the \code{frequency} argument of \code{generate\_steppable}. The intermediary functions are described in Appendix~\ref{code:trans:cc3d:step-gen-general}.
+
+Depending on the values of \code{minimal} and \code{already\_imports}, different portions of the steppable code are included in the final output. \code{already\_imports} tells \code{generate\_steppable} if the imports at the start of the file should be included or not. \code{minimal} defines if the generated steppable should contain only the \code{\_\_init\_\_} and \code{start} functions (\code{minimal = True}), or if it should also contain the \code{step}, \code{finish}, and \code{on\_stop} functions.
+
+
+
+\subsubsection{Constraint Steppable}\label{sec:trans:gen:step:const}
+% We begin by generating the constraint steppable (see Listing~\ref{code:trans:cc3d:constr-step:gen}). The translator loops over the defined cell types (see Listing~\ref{code:trans:cc3d:constr-step:loops}), extracts the constraint dictionaries that are relevant for that type (see Listing~\ref{code:trans:cc3d:constr-step:dicts}), and applies the constraints (see Listing~\ref{code:trans:cc3d:constr-step:constr}). 
+% The translator also does the initialization of the phenotype models, I show the initialization of the phenotypes in the translated \ccds simulation in Listing~\ref{code:trans:cc3d:constr-step:pheno}. Chapter~\ref{cha:phenocell} and~\cite{gianlupi_phenocellpy_2023} describe the phenotype models used by the translator.
+% % To see how the phenotype models are created see Chapter~\ref{cha:phenocell} and~\cite{gianlupi_phenocellpy_2023}.
+
+
+% The creation of the steppables file begins with the generation of the constraint steppable, as outlined in Listing~\ref{code:trans:cc3d:constr-step:gen}. The translator proceeds by iterating through the defined cell types, as indicated in Listing~\ref{code:trans:cc3d:constr-step:loops}, and extracts the pertinent constraint dictionaries associated with each cell type, as demonstrated in Listing~\ref{code:trans:cc3d:constr-step:dicts}. Subsequently, the translator applies these constraints as depicted in Listing~\ref{code:trans:cc3d:constr-step:constr}. Furthermore, the initialization of the phenotype models is carried out by the translator, with the initialization of phenotypes in the translated CompuCell3D simulation illustrated in Listing~\ref{code:trans:cc3d:constr-step:pheno}. Detailed descriptions of the phenotype models employed by the translator can be found in Chapter~\ref{cha:phenocell} and~\cite{gianlupi_phenocellpy_2023}.
+
+
+The creation of the steppables file begins with the generation of the constraint steppable. The function \code{generate\_constraint\_steppable} (Listing~\ref{code:trans:cc3d:constr-step:gen}), is responsible for generating the constraint steppable. Upon invocation, this function takes several parameters, including \code{cell\_types}, \code{cell\_type\_dicts}, \code{wall}, \code{first}, and\\* \code{user\_data}. The \code{cell\_types} parameter represents the defined cell types within the simulation, while \code{cell\_type\_dicts} corresponds to the associated constraint dictionaries relevant to each cell type. The \code{wall} defines if a perimeter wall should be created around the simulation's domain. The \code{first} parameter indicates whether this function is the first steppable to be generated, in which case  the initial imports are included by \code{generate\_steppable}. Finally, \code{user\_data} allows for optional user-defined data and is used to store the custom data extracted from \psc's XML. %The user data is saved to each relevant cell in \ccds by using cell their free-form attribute, the cell dictionary~\cite{cc3d_python_scripting_manual}.
+
+
+Internally, the function relies on auxiliary functions such as \\*\code{generate\_constraint\_loops} (Listing~\ref{code:trans:cc3d:constr-step:loops}) to iterate through the cell types and extract the respective constraint dictionaries. \code{generate\_constraint\_loops} relies on two intermediary functions that are shown in Appendix~\ref{code:trans:cc3d:constraint-loops-helper-function}. 
+
+The function \code{generate\_constraint\_steppable} also employs the \\*\code{initialize\_phenotypes} (Appendix~\ref{code:trans:cc3d:constr-step:pheno}) function to initialize the phenotype models, producing the necessary initialization code. Chapter~\ref{cha:phenocell} goes into more detail of what are the phenotype initialization options. Additionally, the function constructs the required strings for wall constraints, including the sharing of steppable variables.
+
+Ultimately, the function assembles the strings that will define the constraint steppable by invoking the \code{generate\_steppable} function (Listing~\ref{code:trans:cc3d:create-steps:generate-function}), passing relevant arguments such as the name, minimal flag, and any additional code snippets. The resulting constraint steppable string is returned as the output of the function.
+
+% Detailed descriptions of the phenotype models employed by the translator can be found in Chapter~\ref{cha:phenocell} and~\cite{gianlupi_phenocellpy_2023}.
+
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.1,
+% bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def generate_constraint_steppable(cell_types, cell_type_dicts, wall, 
+  first=True, user_data=""):
+    already_imports = not first
+    loops = generate_constraint_loops(cell_types, cell_type_dicts)
+    if not wall:
+        wall_str = "\t\tself.shared_steppable_vars['constraints'] = self"
+    else:
+        wall_str = "\t\tself.build_wall(self.WALL)\n"\
+                   "\t\tself.shared_steppable_vars['constraints'] = self"
+    pheno_init = initialize_phenotypes(cell_type_dicts[0])
+    constraint_step = generate_steppable("Constraints", 1, False, 
+                        minimal=True, already_imports=already_imports,
+                        additional_start=pheno_init + loops + wall_str, 
+                        user_data=user_data)
+    return constraint_step
+\end{minted}
+\caption{Function that builds the constraint initialization steppable class.}\label{code:trans:cc3d:constr-step:gen}
+\end{listing}
+
+
+
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.1,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def generate_constraint_loops(cell_types, cell_dicts):
+    loops = "\n"
+    for ctype in cell_types:
+        this_type_dicts = get_dicts_for_type(ctype, cell_dicts)
+        loop = cell_type_constraint(ctype, this_type_dicts)
+        loops += loop
+    return loops
+\end{minted}
+\caption{Function that builds the start function loops for the constraint initialization steppable. Each defined cell type has a loop over all cells of that type that initializes the constraits relevant to that cell type.}\label{code:trans:cc3d:constr-step:loops}
+\end{listing}
+
+% \begin{listing}[H]%[!htbp]
+% \begin{minted}[
+% frame=lines,
+% framesep=2mm,
+% baselinestretch=1.1,
+% %bgcolor=light-gray,
+% fontsize=\footnotesize,
+% linenos
+% ]{python}
+% def initialize_phenotypes(constraint_dict):
+%     pheno_str = "\n\t\tif pcp_imp:\n"
+%     pheno_str += "\t\t\tself.phenotypes = {}\n"
+%     for ctype, cdict in constraint_dict.items():
+%         if "phenotypes" in cdict.keys():
+%             pheno_str += f"\t\t\tdt = 1/self.mcs_to_time\n"
+%             pheno_str += f"\t\t\tself.phenotypes['{ctype}']" + "= {}\n"
+%             for phenotype, data in cdict["phenotypes"].items():
+%                 time_unit = "None"
+%                 if "rate units" in data.keys():
+%                     time_unit = data["rate units"].split("/")[-1]
+%                 fixed = []
+%                 duration = []
+%                 for fix, dur in data["phase durations"]:
+%                     duration.append(dur)
+%                     if fix == "TRUE":
+%                         ff = True
+%                     else:
+%                         ff = False
+%                     fixed.append(ff)
+%                 nuclear_fluid = []
+%                 nuclear_solid = []
+%                 cyto_fluid = []
+%                 cyto_solid = []
+%                 cyto_to_nucl = []
+%                 if 'fluid fraction' not in data.keys():
+%                     data['fluid fraction'] = [.75] * len(data["phase durations"])
+%                 # if 'fluid fraction' not in data.keys():
+%                 #     data['fluid fraction'] = [.75]*len(data["phase durations"])
+%                 if 'fluid fraction' in data.keys() and 'nuclear volume' in data.keys() and 'total' in data.keys():
+%                     for fluid, nucl, total in zip(data['fluid fraction'], data['nuclear volume'], data['total']):
+%                         nfl = fluid * nucl
+%                         nuclear_fluid.append(nfl)
+%                         nuclear_solid.append(nucl - nfl)
+%                         cytt = total - nucl
+%                         cytf = fluid * cytt
+%                         cyts = cytt - cytf
+%                         cyto_fluid.append(cytf)
+%                         cyto_solid.append(cyts)
+%                         cyto_to_nucl.append(cytt / (1e-16 + nucl))
+%                 else:
+%                     nuclear_fluid = [None] * len(data["phase durations"])
+%                     nuclear_solid = [None] * len(data["phase durations"])
+%                     cyto_fluid = [None] * len(data["phase durations"])
+%                     cyto_solid = [None] * len(data["phase durations"])
+%                     cyto_to_nucl = [None] * len(data["phase durations"])
+%                 if 'calcified fraction' not in data.keys():
+%                     data['calcified fraction'] = [0] * len(data["phase durations"])
+
+%                 if 'cytoplasm biomass change rate' not in data.keys():
+%                     data['cytoplasm biomass change rate'] = [None] * len(data["phase durations"])
+%                 if 'nuclear biomass change rate' not in data.keys():
+%                     data['nuclear biomass change rate'] = [None] * len(data["phase durations"])
+%                 if 'calcification rate' not in data.keys():
+%                     data['calcification rate'] = [None] * len(data["phase durations"])
+%                 if 'fluid change rate' not in data.keys():
+%                     data['fluid change rate'] = [None] * len(data["phase durations"])
+%                 pheno_str += f"\t\t\tphenotype = pcp.get_phenotype_by_name('{phenotype}')\n"
+%                 pheno_str += f"\t\t\tself.phenotypes['{ctype}']['{phenotype}'] = phenotype(dt=dt, \n\t\t\t\t" \
+%                              f"time_unit='{time_unit}', \n\t\t\t\tfixed_durations={fixed},  " \
+%                              f"\n\t\t\t\tphase_durations={duration}, \n\t\t\t\t" \
+%                              f"cytoplasm_volume_change_rate={data['cytoplasm biomass change rate']}, \n\t\t\t\t" \
+%                              f"nuclear_volume_change_rate={data['nuclear biomass change rate']}, \n\t\t\t\t" \
+%                              f"calcification_rate={data['calcification rate']}, \n\t\t\t\t" \
+%                              f"calcified_fraction={data['calcified fraction']}, \n\t\t\t\t" \
+%                              f"target_fluid_fraction={data['fluid fraction']}, \n\t\t\t\t" \
+%                              f"nuclear_fluid={nuclear_fluid}, \n\t\t\t\t" \
+%                              f"nuclear_solid={nuclear_solid}, \n\t\t\t\t" \
+%                              f"nuclear_solid_target={nuclear_solid}, \n\t\t\t\t" \
+%                              f"cytoplasm_fluid={cyto_fluid}, \n\t\t\t\t" \
+%                              f"cytoplasm_solid={cyto_solid}, \n\t\t\t\t" \
+%                              f"cytoplasm_solid_target={cyto_solid}, \n\t\t\t\t" \
+%                              f"target_cytoplasm_to_nuclear_ratio={cyto_to_nucl}, \n\t\t\t\t" \
+%                              f"fluid_change_rate={data['fluid change rate']})\n"
+%     return pheno_str
+% \end{minted}
+% \caption{}\label{code:trans:cc3d:constr-step:pheno}
+% \end{listing}
+
+
+% \begin{listing}[H]%[!htbp]
+% \begin{minted}[
+% frame=lines,
+% framesep=2mm,
+% baselinestretch=1.1,
+% %bgcolor=light-gray,
+% fontsize=\footnotesize,
+% linenos
+% ]{python}
+% def get_dicts_for_type(ctype, cell_dicts):
+%     ds = []
+%     for d in cell_dicts:
+%         if ctype in d.keys():
+%             ds.append(d[ctype])
+%     return ds
+% \end{minted}
+% \caption{}\label{code:trans:cc3d:constr-step:dicts}
+% \end{listing}
+
+% \begin{listing}[H]%[!htbp]
+% \begin{minted}[
+% frame=lines,
+% framesep=2mm,
+% baselinestretch=1.1,
+% %bgcolor=light-gray,
+% fontsize=\footnotesize,
+% linenos
+% ]{python}
+% def cell_type_constraint(ctype, this_type_dicts):
+%     if not this_type_dicts:
+%         return ''
+%     loop = f"\t\tfor cell in self.cell_list_by_type(self.{ctype.upper()}):\n"
+%     full = loop
+%     for cell_dict in this_type_dicts:
+%         for key, value in cell_dict.items():
+%             if key == "phenotypes" and bool(cell_dict["phenotypes"]):
+%                 line = "\t\t\tif pcp_imp:\n"
+%                 line += f"\t\t\t\tcell.dict['{key}']=self.phenotypes['{ctype}']\n"
+%                 line += f"\t\t\t\tcell.dict['current_phenotype'] = cell.dict['{key}']" \
+%                         f"['{cell_dict['phenotypes_names'][0]}'].copy()\n"
+%                 line += f"\t\t\t\tcell.dict['volume_conversion'] = cell.targetVolume / \\\n" \
+%                         f"\t\t\t\t\tcell.dict['current_phenotype'].volume.total\n"
+%             elif key == "custom_data":
+%                 line = f"\t\t\t# NOTE: you are responsible for finding how this data" \
+%                        f"is used in the original model\n\t\t\t# and re-implementing in CC3D" \
+%                        f"\n\t\t\tcell.dict['{key}']={value}\n"
+%             elif type(value) == str:
+%                 line = f"\t\t\tcell.dict['{key}']='{value}'\n"
+%             elif type(value) == dict:
+%                 clean_value = value.copy()
+%                 to_pop = []
+%                 for subkey in value.keys():
+
+%                     if "comment" in subkey:
+%                         to_pop.append(subkey)
+%                 [clean_value.pop(p) for p in to_pop]
+%                 line = f"\t\t\tcell.dict['{key}']={clean_value}\n"
+%             else:
+%                 line = f"\t\t\tcell.dict['{key}']={value}\n"
+%             if key in ["volume", "surface"]:
+%                 line += apply_CC3D_constraint(key, value)
+%             full += line
+%     return full + '\n\n'
+% \end{minted}
+% \caption{}\label{code:trans:cc3d:constr-step:constr}
+% \end{listing}
+
+% \begin{listing}[H]%[!htbp]
+% \begin{minted}[
+% frame=lines,
+% framesep=2mm,
+% baselinestretch=1.1,
+% %bgcolor=light-gray,
+% fontsize=\footnotesize,
+% linenos
+% ]{python}
+% def apply_CC3D_constraint(cname, cdict):
+%     if cname.upper() == "VOLUME":
+%         return _apply_volume_constraint(cdict)
+%     elif cname.upper() == "SURFACE":
+%         return _apply_surface_constraint(cdict)
+%     return ''
+% \end{minted}
+% \caption{}\label{code:trans:cc3d:constr-step:cc3d-const}
+% \end{listing}
+
+% \begin{listing}[H]%[!htbp]
+% \begin{minted}[
+% frame=lines,
+% framesep=2mm,
+% baselinestretch=1.1,
+% %bgcolor=light-gray,
+% fontsize=\footnotesize,
+% linenos
+% ]{python}
+% def _apply_volume_constraint(cdict):
+%     cstr = f'\t\t\tcell.targetVolume = {cdict["volume (pixels)"]}'
+%     cstr += '\n\t\t\t# NOTE: PC does not ' \
+%             f'have an equivalent parameter, you have to adjust it:\n' \
+%             f'\t\t\tcell.lambdaVolume = 8\n'
+%     return cstr
+% \end{minted}
+% \caption{}\label{code:trans:cc3d:constr-step:cc3d-const:vol}
+% \end{listing}
+
+% \begin{listing}[H]%[!htbp]
+% \begin{minted}[
+% frame=lines,
+% framesep=2mm,
+% baselinestretch=1.1,
+% %bgcolor=light-gray,
+% fontsize=\footnotesize,
+% linenos
+% ]{python}
+% def _apply_surface_constraint(cdict):
+%     cstr = f'\t\t\tcell.targetSurface = {cdict["surface (pixels)"]}'
+%     cstr += '\n\t\t\t# NOTE: PC does not ' \
+%             'have an equivalent parameter, you have to adjust it:'
+%     cstr += '\n\t\t\tcell.lambdaSurface = 8\n'
+%     return cstr
+% \end{minted}
+% \caption{}\label{code:trans:cc3d:constr-step:cc3d-const:vol}
+% \end{listing}
+
+
+
+
+\subsubsection{Secretion and Uptake Steppable}\label{sec:trans:gen:step:sec}
+The generation of the secretion and uptake steppable is handled by the \\*\code{generate\_secretion\_uptake\_step} function (see Listing~\ref{code:trans:cc3d:sec-step:gsups}). As usual, behaviors are defined on a cell-type basis (and can be changed on a cell basis), therefore this function takes as an argument the list of cell types. It also takes the dictionary containing secretion-uptake information (\code{sec\_dict}), the steppable call period (\code{secretion\_dt}, the "frequency" in the steppable class), and a flag stating if this will be the first steppable class in the file. If the secretion dictionary is empty we don't need to have a secretion-uptake steppable, therefore the function exits early returning an empty string. 
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.1,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def generate_secretion_uptake_step(cell_types, sec_dict, 
+  secretion_dt=None, first=False):
+    if not sec_dict:
+        message = "WARNING: no secretion data found\n"
+        warnings.warn(message)
+        return ''
+    if secretion_dt is None:
+        secretion_dt = 1
+    already_imports = not first
+    field_names = get_field_names(sec_dict)
+    secretors = make_secretors(field_names)
+    loops = make_secretion_uptake_loops(cell_types, sec_dict)
+    sec_step = generate_steppable("SecretionUptake", secretion_dt, 
+                    False, already_imports=already_imports, 
+                    additional_start=secretors, additional_step=loops)
+    return sec_step
+\end{minted}
+\caption{Secretion-Uptake steppable class generator function. It exits early if there is no secretion data, if a steppable period is not defined it defaults to setting the steppable period to one (\textit{i.e.}, this steppable runs at every time-step in \ccd). It then calls helper functions to build the steppable \code{start} and \code{step} functions, and passes the strings to \code{generate\_steppable}. Finally it returns the steppable as a string.}\label{code:trans:cc3d:sec-step:gsups}
+\end{listing}
+
+To do secretion or uptake \ccds uses a specific object to interact with the fields that has to be initialized, the "secretor" object. The secretion-uptake steppable generation function extracts the names of the diffusing elements that have secretion or uptake from the secretion data dictionary (using \code{get\_field\_names}). With those names it generates \ccds code that will create the secretor objects in \ccds and have them saved in a dictionary for later use during the simulation steps (see Listing~\ref{code:trans:cc3d:sec-step:gsups:sec-dict}). 
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.1,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def make_secretors(field_names):
+    sec_list = "\t\tself.secretors = {"
+    for name in field_names:
+        sec_list += f"'{name}': self.get_field_secretor('{name}'),"
+    sec_list = sec_list[:-1]
+    sec_list += "}\n"
+    return sec_list
+\end{minted}
+\caption{Function that generates the secretor objects declaration for \ccd. Secretors in \ccds are created using the \code{self.get\_field\_secretor(FIELD\_NAME)} function, \code{make\_secretors} loops over the field names and creates a string that will generate the secretors and save them to a dictionary in \ccd. The keys of that dictionary are the field names and the item of the key is the secretor.}\label{code:trans:cc3d:sec-step:gsups:sec-dict}
+\end{listing}
+
+The secretion-uptake generation function then creates the \ccds loops that will have the secretion and uptake calls for each cell (see Listing~\ref{code:trans:cc3d:sec-step:gsups:sec-loops} and~\ref{code:trans:cc3d:sec-step:gsups:sec-loops:loop}). The\\*\code{make\_secretion\_uptake\_loops} (see Listing~\ref{code:trans:cc3d:sec-step:gsups:sec-loops}) function generates a string representation of secretion and uptake loops for all cell types. It takes the cell types, secretion dictionary, secretors dictionary, and field names as inputs. The function initializes a loop structure for iterating over the secretors using the \code{self.secretors} dictionary. It then iterates over each cell type and generates secretion loops only for cell types present in the secretion dictionary. It extracts the comment from the secretion dictionary and calls the \code{make\_secretion\_loop} (Listing~\ref{code:trans:cc3d:sec-step:gsups:sec-loops:loop}) function to generate the secretion loop string. Finally, it concatenates the secretor loop string with the generated secretion loops and returns the resulting string.
+
+The \code{make\_secretion\_loop} function generates a string representation of a secretion loop for a specific cell type. It takes the cell type and a comment as input. The function defines the loop structure using the \code{generate\_cell\_type\_loop} helper function. It includes code to check if the field name exists in the cell's dictionary and retrieves the corresponding data. It calculates the net secretion based on the secretion rate, secretion target, and amount seen by the cell, as described in Section~\ref{sec:trans:impl:sec-upt} and Equation~\ref{eq:trans:net-sec}. In more detail, the secretion and uptake parameters are saved to the cell dictionary bu the constaint steppable. Then the secretion steppable will read those parameters, calculate the net secretion and call the secretor's secretion and uptake functions. The secretion and uptake rates are saved to dictionary entries: "secretion\_rate," "secretion\_target," "uptake\_rate," "net\_export," "secretion\_rate\_MCS," "net\_export\_MCS," "uptake\_rate\_MCS."
+
+The translator includes explanatory comments regarding the different secretion locations in CompuCell3D and the implementation of \psc's net-secretion functionality with the generated steppable. Finally, it calls the secretion and uptake methods of the secretor object. The function returns the generated secretion loop string.
+
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.1,
+% bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def make_secretion_uptake_loops(cell_types, sec_dict):
+    secretor_loop = \
+        "\t\tfor field_name, secretor in self.secretors.items():\n"
+    loops = ""
+    for ctype in cell_types:
+        if ctype in sec_dict.keys():
+            comment = \
+                sec_dict[ctype][
+                    list(sec_dict[ctype].keys())[0]]\
+                    ['secretion_comment'] +'\n'
+            loops += make_secretion_uptake_loop(ctype, comment)
+    return secretor_loop + loops
+\end{minted}
+\caption{This function loops the cell types and diffusing elements that are involved in secretion or uptake and creates a \ccds loop over cells for each cell type and secretor object.}\label{code:trans:cc3d:sec-step:gsups:sec-loops}
+\end{listing}
+
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.1,
+% bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def make_secretion_uptake_loop(ctype, comment):
+    # secretion in physicell is
+    # secretion rate * (target amount - amount at cell) + net secretion
+    # looking at units that is correct:
+    # < secretion_rate units = "1/min" > 0 < / secretion_rate >
+    # < secretion_target units = "substrate density" > 1 
+    #< / secretion_target >
+    # < uptake_rate units = "1/min" > 0 < / uptake_rate >
+    # < net_export_rate units = "total substrate/min" > 0 
+    #< / net_export_rate >
+    loop = generate_cell_type_loop(ctype, 3)
+    check_field = "\t\t\t\tif field_name in cell.dict.keys():\n"\
+        "\t\t\t\t\tdata=cell.dict[field_name]\n"
+    seen = "\t\t\t\t\tseen = secretor.amountSeenByCell(cell)\n"
+    secrete_rate = "\t\t\t\t\tnet_secretion = max(0, "\
+        "data['secretion_rate_MCS']"\
+        " * (data['secretion_target'] - seen)) +"
+        " data['net_export_MCS']\n"
+    where_secrete = "\t\t\t\t\t# In PhysiCell cells are point-like,"\
+        " in CC3D they"\
+        " have an arbitrary shape. With this " \
+        "\n\t\t\t\t\t# CC3D allows several different secretion "\
+        "locations: over"\
+        "the whole cell (what the translator uses),\n\t\t\t\t\t#"\
+        " just inside the "\
+        "cell surface, just outside the surface, at the surface."\
+        " You should "\
+        "explore the options\n"
+    secrete = "\t\t\t\t\tsecretor.secreteInsideCell(cell,"\
+        " net_secretion)\n"
+    uptake = "\t\t\t\t\tsecretor.uptakeInsideCell(cell, 1e10, "\
+        "data['uptake_rate'])\n"
+    return loop + check_field + seen + comment + secrete_rate + \
+        where_secrete + secrete + uptake
+\end{minted}
+\caption{This function creates the loop over cells of a given type. It adds the calculation for net secretion for a given cell by fetching how much of the diffusing element the cell is exposed to and cell specific data for that diffusing element. It then concatenates all parts of the loops and returns them.}\label{code:trans:cc3d:sec-step:gsups:sec-loops:loop}
+\end{listing}
+
+% \begin{listing}[H]%[!htbp]
+% \begin{minted}[
+% frame=lines,
+% framesep=2mm,
+% baselinestretch=1.1,
+% %bgcolor=light-gray,
+% fontsize=\footnotesize,
+% linenos
+% ]{python}
+
+% \end{minted}
+% \caption{}\label{code:trans:cc3d:sec-step:gsups:sec-dict}
+% \end{listing}
+
+Now that the secretion-uptake steppable generator function has built all the necessary strings that will perform secretion and uptake in \ccd, it uses \code{generate\_steppable} to assemble the steppable.
+
+% it passes them to \code{generate\_steppable} (see Listing~\ref{code:trans:cc3d:create-steps:generate-function}). The secretor declaration is passed to\\*\code{generate\_steppable} as part of the steppable class' start function, and the secretion-uptake loops as part of the step function (see Listing~\ref{code:trans:cc3d:sec-step:gsups}).
+
+\subsubsection{Phenotype Steppable}\label{sec:trans:gen:step:pheno}
+The bulk of the necessary steps to use \pcp's~\cite{gianlupi_phenocellpy_2023} phenotypes is done at their initialization. This, as mentioned, is done by the constraint steppable. Therefore, the phenotypes steppable is only responsible for time-stepping the phenotypes, monitoring their return values, and performing cell division.
+
+The \code{generate\_phenotypes\_loops} (see Listing~\ref{code:trans:cc3d:pheno-step:gen}), with a helper function  (see Listing~\ref{code:trans:cc3d:pheno-step:gen:loop}), creates the loops that will do the phenotype time-step. At each time-step a cell using \pcps can change its volume, the translator adds code to change the \ccd's cell volume consistently. As volumes in \pcps have real units and volumes in \ccds are expressed in pixels, the translator uses the conversion factor determined in Section~\ref{sec:trans:impl:space} to keep both volumes consistent.
+
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.1,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def generate_phenotype_steppable(cell_types, cell_dicts, first=False):
+    already_imports = not first
+    loops = generate_phenotypes_loops(cell_types, cell_dicts)
+    pheno_step = generate_steppable("Phenotype", 1, True, 
+                        already_imports=already_imports, 
+                        additional_step=loops)
+    return pheno_step
+\end{minted}
+\caption{Phenotype steppable generator function. It calls\\*\code{generate\_phenotypes\_loops} to generate the loops that update the phenotype models.}\label{code:trans:cc3d:pheno-step:gen}
+\end{listing}
+
+\begin{listing}[H]%[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.1,
+% bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def generate_phenotypes_loops(cell_types, cell_dicts):
+    loops = "\n"
+    loops += "\t\tcells_to_divide = []\n\t\tif pcp_imp:\n\t\t\tpass\n"
+    for ctype in cell_types:
+        this_type_dicts = get_dicts_for_type(ctype, cell_dicts)
+        loop = type_phenotype_step(ctype, this_type_dicts)
+        loops += loop
+    loops += f"\t\t\tfor cell in cells_to_divide:\n\t\t\t\t"\
+             "# WARNING: As cells in CC3D have shape, they can be " \
+             f"divided along their minor/major axis, randomly in" \
+             " half, or along a specific vector\n"
+    loops += "\t\t\t\tself.divide_cell_random_orientation(cell)\n"
+    loops += "\t\t\t\t# self.divide_cell_orientation_vector_based"\
+        "(cell, 1, 1, 0)\n"
+    loops += "\t\t\t\t# self.divide_cell_along_major_axis(cell)\n"
+    loops += "\t\t\t\t# self.divide_cell_along_minor_axis(cell)\n"
+    return loops
+\end{minted}
+\caption{Function that generates the phenotype update loops. Each cell type has its own loop to perform this update. It also creates code to append cells that divide to a list, to loop that list, and call the division method on those cells.}\label{code:trans:cc3d:pheno-step:gen:loop}
+\end{listing}
+
+At each time-step the phenotype of the cell may flag that the cell has changed phases (see Chapter~\ref{cha:phenocell} for the definition of phenotype phase), should be removed from the simulation (\textit{e.g.}, because it has died, or migrated), or that it has undergone cell division (either mitosis or meiosis)~\cite{gianlupi_phenocellpy_2023}, see Chapter~\ref{cha:phenocell}. The translator implements the standard method of performing cell division in \ccd: dividing cells are appended to a separate list, and the program loops over that list and calls the division function on each cell.
+
+% The user has to implement the behaviors for the other cases, of cell removal and phase change. 
+The translator leaves the implementation of behaviors related to phase change and cell removal as a task the user should do (this is pointed out by comments in the generated  steppable). The translator doesn't
+% We don't 
+implement any specific behaviors for this case for a few reasons. The main reason for not implementing cell removal is that, when using a Cellular Potts Model, a cluster of cells may misbehave if a cell is outright removed from its center during a single time-step. Doing so is equivalent to creating a vacuum and can be disruptive to the simulation. If cells are isolated, on the other hand, this poses no issues. A reason for not performing any action on phase change is that those are very model specific and the translator wouldn't be able to define a best general approximation.
+
+\pcps will change internal behaviors (what volume the cell should have, how fast can it change its volume, should the cell calcify, \textit{etc}) automatically. Therefore, it is not, usually, necessary to implement extra behaviors in that case. The user may still want to add statistics related to phase change, or change other aspects of the simulation or the cell at that point.
+
+
+\section{Results (example translations)}\label{sec:trans:examples}
+
+We chose two \pscs simulations to translate as proof of concept. We choose these two simulations for a few reasons, they are available to run online on nanoHUB, they exemplify important \pcps concepts, and the level of extra work that has two be done after the automated translation process is minimal for one of them and extensive for the other.
+
+\subsection{Cell Cycle}\label{sec:trans:examples:cycle}
+The cell cycle example shows how the cell changes volume during \psc's "Flow Cytometry Cell Cycle," it is available to run online~\cite{kurtoglu_cycle_2020}: \url{https://nanohub.org/tools/trcycle}. It is a very simple simulation, it starts with a single cell placed in the center of the lattice, and monitors its division. The online version has a few configuration options, we opted to translate the simplest version. It's important to note that this simulation doesn't specify what units it is using nor what should be its volume (in this case \pscs uses a default volume). Therefore, the translated version also doesn't have units, and the pixel cell volume is set to default minimum.
+
+
+% The cell only moves through brownian motion. There are two chemical fields included in the online version that can be set to arrest the cell cycle, we opted to translate the simplest version
+
+The purpose of this simulation is to show the progression of phases of a \pscs phenotype and how the cell volume changes during the whole cycle. As phenotypes are key, \pcp~\cite{gianlupi_phenocellpy_2023} (see Chapter~\ref{cha:phenocell}) is necessary to run it. 
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{.45\textwidth}
+        \includegraphics[width=\textwidth]{figures/translator/cycle/cells.png}
+        \caption{}\label{fig:trans:cycle:1}
+    \end{subfigure}
+    % \label{fig:my_label}
+    \begin{subfigure}{.45\textwidth}
+        \includegraphics[width=\textwidth]{figures/translator/cycle/phase.png}
+        \caption{}\label{fig:trans:cycle:2}
+    \end{subfigure}
+    \caption{Translated cell cycle simulation. \ref{fig:trans:cycle:1}) The cells in the simulation. \ref{fig:trans:cycle:2}) Color coded cells based on which phase of the cycle they are in.}
+    \label{fig:trans:cycle}
+\end{figure}
+
+This simulation requires minimal extra work. We increased the cell volume and the simulation domain size to make visualization easier and added trackers for cell volume and phenotype phase.
+
+
+Both the original translation and the modified translation are available in the translator's github page: \url{https://github.com/JulianoGianlupi/pcxml2cc3d/tree/9f6c8e7ffc927cd46bbe76f7b56b49d95bbdec41/example-translations/cell_cycle}.
+
+
+\subsection{Biorobots}\label{sec:trans:examples:biorobots}
+The biorobots~\cite{heiland_physicell_2019} simulation does not rely on \pcp's phenotypes, it's goal is to show mechanics and how simple rules applied to agents can lead to complex behavior. This simulation has three cell types: director, worker, and cargo. The directors and cargo are immobile and each secrete a different chemo-attractant. The workers' goal is to place the cargo with the director cells, to do so they seek cargo (using the cargo's chemo-attractant) and attach to the cargo. Then they switch their chemo-attraction from the cargo chemo-attractant to the directors' chemo-attractant. Once they found the director cell they release the cargo and switch their chemo-attraction back to be cargo-seeking. Once a cargo cell attaches to a worker cell it stops secreting the chemo-attractant~\cite{heiland_physicell_2019}. \pcp's biorobots simulation is available to run online \url{https://nanohub.org/tools/pc4biorobots}, the biorobot's landing page has a more detailed description of the simulation.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{.45\textwidth}
+        \includegraphics[width=\textwidth]{figures/translator/biobots/Cell_Field_CellField_2D_XY_0_000500.png}
+        \caption{}\label{fig:trans:biobot:1}
+    \end{subfigure}
+    % \label{fig:my_label}
+    \begin{subfigure}{.45\textwidth}
+        \includegraphics[width=\textwidth]{figures/translator/biobots/cargo_signal_ConField_2D_XY_0_000500.png}
+        \caption{}\label{fig:trans:biobot:2}
+    \end{subfigure}
+% 
+    \begin{subfigure}{.45\textwidth}
+        \includegraphics[width=\textwidth]{figures/translator/biobots/director_signal_ConField_2D_XY_0_000500.png}
+        \caption{}\label{fig:trans:biobot:3}
+    \end{subfigure}
+    % \label{fig:my_label}
+    % \begin{subfigure}{.45\textwidth}
+    %     \includegraphics[width=\textwidth]{figures/translator/neigh/Picture4.png}
+    %     \caption{}\label{fig:trans:neigh:4}
+    % \end{subfigure}
+    \caption{Translated biorobots simulation. \ref{fig:trans:biobot:1}) The color-coded cells (cargo in blue, workers in red, and directors in yellow). \ref{fig:trans:biobot:2}) The cargo cells' chemo-attractant field levels. \ref{fig:trans:biobot:3}) The directors' chemo-attractant field levels.}
+    \label{fig:trans:biobot}
+\end{figure}
+
+This simulation requires more extensive post-translation work when compared to the cell cycle simulation. It has several behavioral rules that need to be applied, the initial cell placement is complex, and it requires some \ccds plugins to be included that are not automatically generated by the translator.
+
+The extra steps needed to finish the biorobots translation are:
+
+\begin{itemize}
+    \item Load the extra plugins: Neighbor Tracker,  Focal Point Plasticity, External Potential. Neighbor Tracker is used to detect cell neighbors and manipulate them, and Focal Point Plasticity and External potential help the worker cells carry their cargo.  Focal Point Plasticity creates a spring-like energy potential between two cells, External Potential allows for the use of arbitrary forces on cells. 
+    \item Remove the default cell placement and re-create the initial placement from \psc. Cargo cells are placed in groups of seven, each group is placed in a random empty space of the simulation. Worker and director cells are placed randomly.
+    \item Re-implement the agent rules from the \pscs simulation. \textit{E.g.}, switching the chemo-attraction of worker cells from one field to the other.
+\end{itemize}
+
+For practicality purposes, the director cells set to be frozen, and when a cargo cell is delivered the simulation transforms that cargo cell into a director cell (but the previously cargo cell does not secrete the director chemo-attractant). The cargo attachment to the worker is done by creating a focal point plasticity link between the work and cargo cells and, to help the workers pull their cargo, the simulation applies a force to the cargo cell thqat points towards the center of the worker cell.
+
+The translated simulation time to completion is orders of magnitude higher when compared to the original. The online deployment of the original, running online on limited resources, finishes the run in 2 minutes. The translated version, running on a Windows PC with 16 GB of RAM took over 24 hours to finish. This extreme time to completion was measured \textit{after} we reduced the simulated domain of the translated simulation from $1837\times1837\,\,pixels$ to $500\times500\,\,pixels$.
+
+Both the original translation and the modified translation are available in the translator's github page \url{https://github.com/JulianoGianlupi/pcxml2cc3d} under the directory "example\--translations/biorobots".%\url{https://github.com/JulianoGianlupi/pcxml2cc3d/tree/9f6c8e7ffc927cd46bbe76f7b56b49d95bbdec41/example-translations/biorobots}.
+
+% \subsubsection{Changes Details}
+
+% We first define 
+
+
+\section{Discussion}\label{sec:trans:disc}
+
+
+The development and implementation of the translator for converting PhysiCell simulations to CompuCell3D format is a crucial step in facilitating cross-platform compatibility and enabling the utilization of simulation models in different computational frameworks. It successfully converts PhysiCell simulations to CompuCell3D format, demonstrating the feasibility of converting model definitions from diverse simulation frameworks (Cellular Potts and center-based). By converting essential information such as simulation parameters, cell types, diffusion and decay constants, and model plugins, the translator ensures compatibility between the two frameworks. In this study, we presented a detailed description and analysis of the translator, highlighting its key functionalities, challenges encountered during the conversion process, and solutions to some of the challenges.
+
+
+
+% One of the primary objectives of the translator was to convert all the essential information about the PhysiCell simulation, including the simulation parameters, cell types, diffusion and decay constants, and model plugins, into units compatible with CompuCell3D. By addressing the conversion issues and mitigating any discrepancies between the two frameworks, the translator successfully generated files that could be readily used by CompuCell3D.
+
+% The XML file played a pivotal role in the translation process, as it was responsible for setting global parameters and loading model plugins in CompuCell3D. Setting diffusion and decay constants for diffusing elements and defining cell types were essential for accurately representing the simulation behavior. Additionally, the inclusion or exclusion of specific plugins, such as the secretion plugin, directly impacted the presence or absence of secretion and uptake phenomena within the simulation.
+
+The XML file structure employed by PhysiCell simplifies the translation process by centralizing and easily parsing model information (as of version 1.10.4). This highlights the potential of XML or similar formats as effective means of general agent-based model specification.
+
+% \psc's model specification being centered in a single XML file (as of version 1.10.4) played a pivotal role in the translation process. It meant that information about the model was also centralized, and easy to parse. This points to XML (or similar formats) being good candidates for a general agent-based model specification file.
+
+
+% To organize the converted simulation files, the translator allowed users to specify a target folder. In cases where no folder was specified, a default folder named 'CC3D converted sim' was created in the same directory as the original PhysiCell XML file, ensuring convenient accessibility and management of the translated simulation.
+
+% The translator also incorporated various steppables and loops to ensure the proper execution of simulation steps and the application of constraints. For instance, the constraint steppable was generated by looping over defined cell types and extracting relevant constraint dictionaries, which were then applied to the simulation. Similarly, the initialization of phenotype models was implemented, with detailed illustrations provided in the translated CompuCell3D simulation.
+
+The successful implementation of the translator offers researchers a valuable tool for transitioning their PhysiCell simulations to the CompuCell3D framework. By providing a means to overcome platform-specific incompatibilities and enabling simulation interoperability, the translator enhances collaboration and facilitates the exploration of diverse computational biology models and methodologies.
+
+While the translation process may require some additional implementation steps left to the user (see Section~\ref{sec:trans:disc:lims}), the translator performs the majority of the work and generates a functional simulation. It demonstrates the feasibility and value of creating a general agent-based model by successfully translating model definitions across different frameworks.  Moreover, it proves that the endeavor of creating a general agent-based model can be fruitful and is worthwhile, as it is possible to go from one model definition to a very different style of definition and model. Therefore, the creation of a general definition is doable.
+
+We also present what are the likely points of difficulty, namely concepts that are missing from one platform (\textit{e.g.}, phenotypes in \ccd), differences in simulation scales (\textit{e.g.}, simulation size, and other platform specific limitations), 
+or the differences in the dynamics (\textit{e.g.}, adhesion force in \pscs and contact energy in \ccd). The implementation of the translator shows possible solutions to those difficulties, such as creating a general implementation of missing components, like the creation of \pcp~\cite{gianlupi_phenocellpy_2023}, see Chapter~\ref{cha:phenocell}.
+
+As a proof of concept and prototype the translator we developed and presented is successful in doing the bulk of the translation work for the modeler. 
+
+% Although the translation process is not complete and leaves certain implementation steps as an exercise to the reader (see Section~\ref{sec:trans:disc:lims} for a discussion of the limitations), it does most of the work and results in simulation that runs. Moreover, it proves that the endeavor of creating a general agent-based model can be fruitful and is worthwhile. As it is possible to go from one model definition to a very different style of definition and model, the creation of a general definition is doable and should be more straight forward. It also presents what are the likely points of difficulty, namely concepts that are missing from one platform (\textit{e.g.}, phenotypes in \ccd), differences in simulation scales (\textit{e.g.}, simulation size, and other platform specific limitations), 
+% or the differences in the dynamics (adhesion force in \pscs and contact energy in \ccd). The implementation of the translator shows possible solutions to those difficulties, such as creating a general implementation of missing components, like the creation of \pcps to make \psc's phenotypes available as a Python package (\pcp~\cite{gianlupi_phenocellpy_2023}, see Chapter~\ref{cha:phenocell}). 
+
+
+\subsection{Limitations \& Future Work}\label{sec:trans:disc:lims}
+The translator for converting PhysiCell simulations to CompuCell3D format has certain limitations that should be acknowledged. These limitations arise from the differences between the two frameworks and the challenges involved in translating simulation models across platforms. Some of these limitations were expected and some were identified by the exercise of building the translator. All of these will most likely also be relevant to the creation of a universal ABM model specification formalism.
+
+\textit{Incomplete Translation}: The translation process performed by the translator is not fully comprehensive and may leave certain implementation steps to be addressed by the user. For instance, the initial placement of cells is not converted, and a few model components need to be calibrated by hand.
+
+\textit{Platform-Specific Concepts}: The translator encounters difficulties when dealing with concepts that are specific to one platform but absent in the other. For example, CompuCell3D lacks the notion of phenotypes present in PhysiCell. The creation of \pcps has addressed this particular limitation, but it involved a spin-off project. Another example is the translation of cell adhesion and repulsion, which is not done. We are currently investigating a method of using an alternative energy term in \ccds for cell contact as a method to implement \psc's adhesion and repulsion forces
+% a workaround for cell-adhesion 
+(see Section~\ref{sec:trans:chal:adhesion}). Addressing these differences and finding suitable equivalents or workarounds is essential for a successful translation and a successful universal model specification standard.
+
+\textit{Scale and Limitations}: Differences in simulation scales, such as total simulation domain size, the time-scale of a time-step, the length-scale of the simulation, and number of agents. The computing requirements of a platform can limit what can be ported from the other platform. We have performed several adjustments to simulation size, simulation spatial length (\textit{i.e.}, how many total $\mu m$ the simulation covers), simulation time-scale, and other parameters to have a simulation that is capable to run.
+
+\textit{Dynamics and Behavior}: The dynamics and behavior of the simulation models may differ between PhysiCell and CompuCell3D (or any other two platforms) due to variations in underlying algorithms and modeling approaches. Adapting these dynamics to the target platform may require careful consideration and potential adjustments.
+
+\textit{User Responsibility}: The translator performs the majority of the work in the translation process but places some responsibilities on the user. Implementing missing components or addressing specific platform requirements may require additional effort and expertise from the user.
+
+\textit{Run Time Differences}: \pscs style simulations are generally faster to run. In CPM, at each time-step, the dynamics need at least "number of pixel" calculations of the energy change to get the pixel move probability (see Section~\ref{sec:abm:cpm-history}, and Equations~\ref{eq:abm:cpm-hamiltonian} and~\ref{eq:abm:flip-attempt:prob}). As more energy terms are added this calculation becomes more costly. \pscs in particular uses a very well optimized diffusion solver, whereas \ccds uses a simple forward Euler solver.
+
+These limitations highlight the complexities and nuances involved in translating simulation models between different computational frameworks and in building a universal model specification for ABMs that will work for all platforms and methodologies.
+
+\subsection{Software requirements}\label{sec:trans:disc:req}
+The translator itself is very lightweight and runs in seconds, posing no requirements for hardware. The only requirements are Python packages that it uses and are not part of Python's standard library. They are:
+
+\begin{itemize}
+    \item \code{xmltodict}, \url{https://github.com/martinblech/xmltodict},
+    \item \code{autopep8}, \url{https://github.com/hhatto/autopep8} (optional).
+\end{itemize}
+
+
+
+

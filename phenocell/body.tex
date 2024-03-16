@@ -1,0 +1,783 @@
+
+\section{Introduction}\label{sec:intro}
+
+Repeatedly in biology we see stereotyped sequences of transitions between relatively distinct phases. While such sequences of phases occur at the scale of societies, ecosystems, animals, organelles, macro-molecular machines, the classical example occurs at the scale of cells. This paper will primarily discuss sequences of cell phases, but the concepts and tools developed generalize easily to other biological agents.
+
+% footnote about terminology
+
+A typical example for cells would be the cell cycle, either simplified as proliferation followed by quiescence (see Section~\ref{sec:predef:ki67-basic}), or in its more complete form of G0/G1 followed by S, G2, M (Figure~\ref{fig:example-seq:cell-cycle}, see Sections~\ref{sec:predef:flow-basic} and~\ref{sec:predef:flow-adv}). Another example would be a model of a SARS-CoV-2 infected cell, the cell transitions from an uninfected state (or phase) to an infected state with no viral release (eclipse phase), then to a virus releasing state, and finally  dies~\cite{sego_modular_2020} (Figure~\ref{fig:example-seq:infec-seq}). 
+
+\begin{figure}[!htbp]
+    \centering
+    \begin{subfigure}{0.45\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/cell-cycle.png}
+        \caption{}\label{fig:example-seq:cell-cycle}
+    \end{subfigure}
+    \begin{subfigure}{0.45\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/infec-seq.png}
+        \caption{}\label{fig:example-seq:infec-seq}
+    \end{subfigure}
+    \caption{Example sequences of cell behaviors. a) Cell cycle. b) Stages of viral infection of a cell.}\label{fig:example-seq}
+\end{figure}
+
+For biological systems modeling, it is important to have a structured definition of biological states, sequences of states, and conditions to go from one state to the next. Abstracting cellular behaviors, or, more generally, biological-agent behavior, into a computer model requires the modeler to simultaneously understand the biology of interest and the implementation of that biology in a computational framework. To make modeling more accessible to biologists we need to simplify the transition from the biological description to computational implementation. 
+
+There are many computational frameworks for modeling multiscale cellular system: CompuCell3D, Tissue Forge, Morpheus, PhysiCell, Artistoo, FLAME, \textit{etc.}
+Currently, each modeling framework requires a different type of description of behaviors and behavior transition triggers, and often do not have a defined standard for basic biological \textit{processes} like "cell cycle". Often implementations of cell, or biological-agent, behaviors are platform-specific and even modeler-specific. This results in models of cell behaviors that are difficult to interpret, share and re-use as well as being restricted to the platform they were created in. This situation makes it difficult to separate the biology being modeled from the framework it is being modelled in. Ideally, the description of the biology being modeled should be separate from its algorithmic implementation.
+
+For instance, a model of sequence of cell behaviors built for CompuCell3D~\cite{swat_multi-scale_2012} of, \textit{e.g.}, infected cell states~\cite{sego_modular_2020}, can't be simply copied and re-used as-is in some other platform (\textit{e.g.}, Tissue Forge~\cite{sego_tissue_2022}). The modeler has to back out the underlying conceptual model of the phases and their transition rules by interpreting the original implementation, which mixes the biological concepts and the implementing code, and re-code it according to the model specification structure in the new platform. This interpretation is time consuming and subject to many types of error, including misunderstanding of the original model structure and transition rules, mismapping of model-specific parameter values and the possibility of introducing coding errors when the conceptual rules are remapped to code in the new model specification language.
+
+% . If a modeler wants to use it in some other platform (\textit{e.g.}, Tissue Forge~\cite{sego_tissue_2022}) they have to back out the underlying conceptual model of the phases and their transition rules by interpreting the original implementation, which mixes the biological concepts and the implementing code, and re-code it according to the model specification structure in the new platform. This interpretation is time consuming and subject to many types of error, including misunderstanding of the original model structure and transition rules, mismapping of model-specific parameter values and the possibility of introducing coding errors when the conceptual rules are remapped to code in the new model specification language.
+
+The PhysiCell~\cite{ghaffarizadeh_physicell_2018} package has developed a really elegant way to do this. Phenotypes\footnote{\label{foot:names-in-bio}Nomenclature in biology is diverse, with several different definitions for the same term. We define what phenotype and phase mean in the context of PhysiCell and \pcps in our text.} 
+are defined as the sequence of behaviors and are implemented as a class. The different behaviors that make up a phenotype are called phase. The trigger to go from one phase to the next can be set to either be deterministic after a set time, or stochastic with a set rate. The transition can also depend on environmental factors, or on the cell size.
+We believe PhysiCell's approach to phenotypes would be valuable in many other multicellular model frameworks, \textit{e.g.}, in CompuCell3D~\cite{swat_multi-scale_2012}, and Tissue Forge. Currently PhysiCell's implementation of phenotypes is in C++ and is closely linked with the PhysiCell package, making it difficult to reuse in other modeling frameworks. 
+
+
+% add footnotes that are bioportal's ontologies
+
+% footnote that the terminology in biology is not clear/muddy. sometimes phenotype means bla, sometimes x... 
+PhenoCellPy implements and makes available for general use PhysiCell's phenotype functionality in in the form of a Python package. It also makes the process of generating new phenotypes, phases, and phase change triggers easy. This
+addresses the issues of lack of standards and platform specificity,  by creating an easy to use and platform-independent Python package 
+% describing biological-agents behaviors (called phase) and sequence of behaviors (called phenotype) 
+that can be embedded in other models. PhenoCellPy is an open-source package, its source code is available at its GitHub repository~\cite{gianlupi_phenocellpy_2022}. Although the concepts and methods of \pcps are general to many types of biological agents (cells, mitochondria, nucleus, certain organelles) it was built with the cell as the focus.
+
+% Again you are mixing a general schema with a specific example of cell cycle. I would do the generic schema first. The PHENOTYPE consists of a SET of PHASES and a set of TRANSITION rules that define events where an individual agent changes its PHASE. Conditional transition rules define which phases can succeed each other and when these transitions occur. Relational transition rules define how the state variables in one phase relate to those in a preceeding phase. You also have to explain existential transitions where AGENTS are created or destroyed. Then you can introduce the concepts of temporal relationships within and between PHASES and also the idea of deterministic and probabilistic transition rules.
+
+Phenotype here can mean the cell cycle, the sequential stages of necrosis, the fact that the cell is alive, the fact that it is dead, the different stages of viral infection, \textit{etc}. Phenotype is, then, the set of observable characteristics or traits of an organism.
+
+In \pcps we create methods and Python classes to define cell behaviors, sequences of cell behaviors, and rules for the behavior switching. We have built several pre-packaged models representing phenotypes of cell behaviors to show-case \pcp's capabilities (see Section~\ref{sec:predef}). 
+
+% by defining a standard way to build and use biological behaviors, sequences of behaviors, and their transitions. \pcps is an opens source python package that can be embedded with existing (python) biological models. 
+
+% Experiment is the gold standard for understanding how biological systems work. However, experiments are costly, time consuming, and often limited by  ethical concerns. Biological mechanistic computer experiments (\textit{in silico} experiments) provide new approaches to avoid expensive or ethically challenging experiments. Mechanistic models can investigate emergent behavior of  biological components at any desired level of detail. Individual behaviors can be modified, \textit{e.g.}, what happens to a tumor if the growth rate, and only the growth rate, of one type of cell changes? In  \textit{in vivo/vitro} experiments changing a single component behavior independently is usually impossible, since biological behaviors are typically the result of complex sets of interactions and often that set of interactions is not well understood.
+
+% Abstracting cellular behaviors and their inter-connectedness into a computer model can requires the modeler to have a daunting level of sophistication: modelers need to simultaneously understand the biology of interest and the implementation of that biology in a computational framework. In addition, each modeling platform requires a different type of description of components and behaviors, and often do not have a defined standard for basic biological \textbf{objects} like "cell" or basic biological \textbf{processes} like "cell cycle". Often \textit{ad hoc} descriptions of cell behaviors are platform-specific and even modeler-specific. This results in models of cells behaviors that are difficult to interpret, share and re-use as well as being restricted to the platform they were created in. These issues contribute to several significant challenges in the use of computational models in biological research. Models are often opaque in the biology being modelled and in the algorithmic implementation of that biology in a computer model. This situation makes it difficult to separate the biology being modeled from the framework it is being modelled in. Ideally, the description of the biology being modeled should be separate from its algorithmic implementation. Commingling of biology and code contributes to the often observed lack of reproducibility in this field. (cite) This lack of reproducibility is a significant barrier to realizing the potential benefits of \textit{in silico} experiments. 
+
+% For instance, in a typical model of a SARS-CoV-2 infected cell, the cell transitions from an uninfected state (or phase) to an infected state with no viral release (eclipse phase), then to a virus releasing state, and finally  dies~\cite{sego_modular_2020}. 
+% A cell's transitions from one phase of the infection to the next depends on many factors, \textit{e.g.}, the number of virions in the cell. In~\cite{sego_modular_2020}, the authors had to define cell states to represent the phases of infection within a cell, create \textit{ad hoc} implementation of rules controlling  transitions from one phase to the next, and simultaneously coordinate between model classes and instances of cells in contact and in communication. However, their cell behavior model for an infected cell cannot be easily reused in a different simulation platform. In this case it was built for CompuCell3D~\cite{swat_multi-scale_2012}, a Cellular Potts Model~\cite{graner1992simulation} (CPM) platform which uses Python scripts for rule and state specification. If a modeler wants to use it in some other platform (\textit{e.g.}, Tissue Forge~\cite{sego_tissue_2022}) they have to back out the underlying conceptual model of the phases and their transition rules by interpreting the original implementation, which mixes the biological concepts and the implementing code, and re-code it according to the model specification structure in the new platform. This interpretation is time consuming and subject to many types of error, including misunderstanding of the original model structure and transition rules, mismapping of model-specific parameter values and the possibility of introducing coding errors when the conceptual rules are remapped to code in the new model specification language.
+
+% To make the development of new biological models we have created PhenoCellPy. PhenoCellPy defines methods and Python classes that make the definition of sequence of cell behaviors easier. The main class is the Phenotype (Section~\ref{sec:meth:pheno}), which is the container of cell behaviors. Phenotype here can mean the cell cycle, the stages of necrosis, the fact that the cell is alive, the fact that it is dead, \textit{etc}. The Phenotype is made of one or more Phases (Section~\ref{sec:meth:phase}), each Phase defines the target volume for the cell and the volume change rates it displays. It also defines which is the next Phase of the Phenotype, what conditions trigger Phase change, if cell division occurs when exiting the Phase, what behaviors occur immediately on Phase entry and just before Phase exit (\textit{e.g.}, changing the target volume). The cell volume dynamics are handled by the Cell Volume class. The cell volume is subdivided among the solid and fluid cytoplasm, solid and fluid nucleus, and a calcified fraction.
+
+
+
+% Our goal is to address these limitations by creating an easy to use and platform-independent Python package describing cell phases that can be embedded in other models: \pcp. PhenoCellPy is an open-source Python package available at its GitHub repository~\cite{gianlupi_phenocellpy_2022}. In \pcps we create methods and Python classes to define cell behaviors, sequences of cell behaviors, and rules for the behavior switching. We have built several pre-packaged models representing common applications (see Section~\ref{sec:predef}) of cell behaviors to show-case \pcp's capabilities. 
+
+% Phenotype here can mean the cell cycle, the sequential stages of necrosis, the fact that the cell is alive, the fact that it is dead, the different stages of viral infection, \textit{etc}. Phenotype is, then, the set of observable characteristics or traits of an organism. The term covers the organism's morphology, its developmental processes, its biochemical and physiological properties, its behaviors, and the products of behaviors. 
+
+
+An abstract Phenotype consists of one or more Phases (Section~\ref{sec:meth:phase}), each Phase defines the volume of the cell, and the volume change rates the Phase displays. It also defines which is the next Phase of the Phenotype, what conditions trigger Phase change, if the agent should divide when exiting the Phase, what behaviors occur immediately on Phase entry and just before Phase exit (\textit{e.g.}, changing the target volume). The cell volume dynamics are handled by the Cell Volume class. The cell volume is subdivided among the solid and fluid cytoplasm, solid and fluid nucleus, and a calcified fraction.
+
+\begin{listing}[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+# making an empty list to save the diving cells to 
+dividing_cells = []
+# looping over all CompuCell3D cells
+for cell in self.cell_list:
+    # calling PhenoCellPy's time-step and saving the flags returned 
+    # from it.
+    # each cell has its own cell dictionary (cell.dict), we have 
+    # initialized each
+    # cell's phenotype to cell.dict["phenotype"] 
+    changed_phase, should_be_removed, divides = \
+            cell.dict["phenotype"].time_step_phenotype()
+    if changed_phase:
+        # if the phenotype of cell changes phase we call extra tasks 
+        # we may have defined on the agent
+        self.phase_change_tasks(cell)
+    if should_be_removed:
+        # if the phenotype returns that the cell should be removed from 
+        # the simulation we call CompuCell3D's deletion method
+        self.delete_cell(cell)
+    if divides:
+        # if the phenotype of cell says the cell has divided we add the 
+        # cell to the dividing cell list to call CompuCell3D's 
+        # division method later
+        dividing_cells.append(cell)
+# looping over dividing cells
+for cell in dividing_cells:
+    # calling CC3D's division method on relevant cells
+    self.divide_cell_random_orientation(cell)
+\end{minted}
+\caption{Example implementation of continuous \pcps tasks in \ccd. Each CC3D cell has its own cell dictionary (\code{cell.dict}) that can have custom data. We have saved each cell's Phenotype to the key "phenotype" in the dictionary, see Listing~\ref{code:pcp:attach-cc3d}.}\label{code:pcp:step}
+\end{listing}
+
+
+% To make the development of new biological models we have created PhenoCellPy. PhenoCellPy defines methods and Python classes that make the definition of sequence of cell behaviors easier. The sequence of behaviors is the Phenotype (Section~\ref{sec:meth:pheno}). Phenotype here can mean the cell cycle, the stages of necrosis, the fact that the cell is alive, the fact that it is dead, the different stages of viral infection, \textit{etc}. The Phenotype is made of one or more Phases (Section~\ref{sec:meth:phase}), each Phase defines the volume of the cell, if that volume should change, and the volume change rates the Phase displays. It also defines which is the next Phase of the Phenotype, what conditions trigger Phase change, if cell division occurs when exiting the Phase, what behaviors occur immediately on Phase entry and just before Phase exit (\textit{e.g.}, changing the target volume). The cell volume dynamics are handled by the Cell Volume class. The cell volume is subdivided among the solid and fluid cytoplasm, solid and fluid nucleus, and a calcified fraction.
+
+% \pcp's goal is to address some current modeling framework limitations by building pre-packaged models (see Section~\ref{sec:predef}) of cell behaviors and giving modelers easy to use methods to build their own cell behavior models. For instance, when modeling SARS-CoV-2 a cell moves from an uninfected state to an infected state with no viral release (eclipse phase), to be releasing virus, and finally it dies~\cite{sego_modular_2020}. Cell transition from one phase of the infection to the next depends on the viral load in the cell among other factors. In~\cite{sego_modular_2020}, the authors had to create cell states to represent the phases of intracellular infection, and how to transition from one phase to the next, and keep coordination in-between several model classes. With \pcps they would define a infection Phenotype, with custom transition functions and in time-step tasks, and add their Phenotype to the modeled agents as an object.
+
+
+% Defining dynamic cellular behaviors (or states) and how one cellular state leads to the next is not trivial. 
+
+% For instance, when modeling SARS-CoV-2 a cell moves from an uninfected state to an infected state with no viral release (eclipse phase), to be releasing virus, and finally it dies~\cite{sego_modular_2020}. Transitioning from one phase of the infection to the next depends on the viral load in the cell among other factors. This process can be represented in \pcps by a Phenotype (Section~\ref{sec:meth:pheno}) composed of the uninfected, eclipse infection, releasing virus, and dead Phases (Section~\ref{sec:meth:phase}).
+
+
+
+% In PhenoCellPy a cell Phenotype (see Section~\ref{sec:meth:pheno}) is defined as a sequence of Phases (see Section~\ref{sec:meth:phase}), as mentioned, both the Phenotype and the Phase are Python classes. Each Phase class defines cellular behaviors and proprieties, \textit{e.g.} target volume, volume change rates (see Section~\ref{sec:meth:vol}). The Phase also determines how the  transition to the next Phase in the Phenotype sequence occurs. 
+% By default, the Phase transition can be either stochastic (with a set Phase transition rate) or deterministic (with a set Phase period). The user can also define a custom transition function. One of our pre-built Phenotypes, the Necrotic Standard Model (see Section~\ref{sec:predef:necro}), uses a custom transition function for its first Phase (which represents the osmotic swelling of a necrotic cell). The custom transition function monitors the cell volume and changes from the swelling Phase to the ruptured cell Phase when the cell reaches its rupturing volume. The Phase class can, optionally, check if a cell should exit the Phenotype and enter quiescence. In Section~\ref{sec:meth:phase}, we go into more detail about the Phases. 
+
+% As mentioned, a Phenotype can be any sequence of Phases. For instance, the cell cycle is a Phenotype. The modeler using PhenoCellPy must call the division methods of the modeling framework being used to divide the cell. 
+
+% The Phenotype class defines what is the ordered list of Phases that it goes through, which phase the Phenotype starts at, if the cell can exit the Phenotype and go into quiescence, and more methods. In Section~\ref{sec:meth:pheno}, we go into more detail about the Phenotypes.
+
+% The cell volume is handled as another python class. It is segmented into cytoplasmic fluid volume, cytoplasmic solid volume, nuclear fluid volume, and nuclear solid volume; the cell may also be partially calcified. The cell volume python class uses the current Phase volume parameters to drift the cell volume towards its target at the set volume change rates. The cytoplasmic target volumes and nuclear target volumes can be set separately, as can the different volumes' change rates. In Section~\ref{sec:meth:vol}, we go into more detail about the volume model.
+
+PhenoCellPy is intended to be used with other python-based modeling frameworks as an embedded model. A \pcps phenotype should be attached to each relevant agent in the main model, then for each main model agent that has a Phenotype the Phenotype time-step method should be called at every main model time-step. The Phenotype time-step will return boolean flags for cell division, removal from the simulation (\textit{e.g.}, cell death, migration), and cell division, the user is then responsible for performing tasks based on those flags. For instance, in the Necrosis Standard CompuCell3D example (see online \url{https://github.com/JulianoGianlupi/PhenoCellPy/tree/main/CC3D_examples/Necrosis}), the CompuCell3D cell changes its cell type (see~\cite{swat_multi-scale_2012} for a definition of cell type in \ccd) when changing from the "hydropic/osmotic swell"\footnote{see BioPortal's ontology definition for hydropic \url{https://bioportal.bioontology.org/ontologies/PATO?p=classes&conceptid=http\%3A\%2F\%2Fpurl.obolibrary.org\%2Fobo\%2FPATO_0002119}} Phase to the "lysed"\footnote{see BioPortal's ontology definition for lysed \url{https://bioportal.bioontology.org/ontologies/PATO?p=classes&conceptid=http\%3A\%2F\%2Fpurl.obolibrary.org\%2Fobo\%2FPATO_0065001}} Phase (see Section~\ref{sec:predef:necro} for information about the pre-built necrosis Phenotype). Listing~\ref{code:pcp:step} shows a generic implementation of continuous \pcps tasks in a \ccds simulation.
+
+We currently have developed and tested \pcps embedded models in CompuCell3D~\cite{swat_multi-scale_2012} (CC3D) and Tissue Forge~\cite{sego_tissue_2022} (TF). 
+
+
+
+\section{\pcps Overview}\label{sec:meth}
+% \pcp's goal is to address some current modeling framework limitations by building pre-packaged models (see Section~\ref{sec:predef}) of cell behaviors and giving modelers easy to use methods to build their own cell behavior models. For instance, in~\cite{sego_modular_2020} the authors had to create cell states to represent the phases of intracellular infection, and keep coordination in-between several model classes. With \pcps they would define a infection Phenotype, with custom transition functions and in time-step tasks, and add their Phenotype to the modeled agents as an object.
+
+\pcps makes the construction of new behavior models easy by breaking them into component parts. The Phenotype class (Section~\ref{sec:meth:pheno}) is the main  "container" 
+% TODO JFG: better term?]} 
+of behavior. It can contain all the stages of infection, all the stages of the cell cycle, all the phases of necrosis, \textit{etc}. The Phenotype is broken down into component phases, represented by the Phase class (Section~\ref{sec:meth:phase}). The Phase class contains more specific behaviors, \textit{e.g.},  osmotic swelling (necrosis), cell rupture, volume decrease during apoptosis. The Phase class also defines what should be the volume change rates, and what is the trigger for Phase change. Finally the cell volume dynamics are handled by the Cell Volume class (Section~\ref{sec:meth:vol}). Figure~\ref{fig:schematics-general} shows schematics of how \pcps is organized.
+
+% \begin{figure}[H]
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=.9\linewidth]{phenocell/figures/general_schematic2.png} % TODO: replace png with pdf/svg
+    \caption{How \pcp\space is organized.Gray boxes are \pcps classes, the blue trapezoid is the lists of constituent Phases. Ownership of objects is conveyed through overlaying shapes (\textit{e.g.}, the Phenotype owns the list of Phases, the Phase owns the Cell Volume). Yellow arrows indicate sequence in the list of Phases. Any Phase could go to any other Phase, as dictated by the modeler. A Phase can have exits to any number of Phases, and a Phase can have entrances from multiple Phases.}
+    \label{fig:schematics-general}
+\end{figure}
+
+% TODO: show that you can arbritarily go to any phase 
+% TODO: Have the out-of-phase Phase
+
+We will now briefly describe how to use each class and give an overview of how they work. Starting with the Cell Volume class and working our way up to the Phenotype class. In Section~\ref{sec:meth:how-to-use}, we give a brief example of \pcp's use. For further detail on how \pcp\space is implemented in Python see Supplemental Materials~\ref{sec:meth-old}. 
+
+\subsection{Cell Volume Class}\label{sec:meth:vol}
+The Cell Volume class defines how big the simulated cell is and how much of its volume is taken by the nucleus and cytoplasm. It also separates the cellular volume into fluid and solid fractions, and has a concept of a calcified volume fraction. All the volumes and fractional volumes we define, as well as volume change rates are in Table~\ref{tab:cell-volume:volumes-rates}. The user of PhenoCellPy should decide if the different volumes should be explicitly included in their model, or if they will use only the cytoplasm and nuclear volumes (without a distinction of solid and fluid fraction), or, simply, the total cell volume. The default volumes used by PhenoCellPy are from MCF-7 cells~\cite{noauthor_mcf-7_nodate} in cubic microns.
+
+
+The volume dynamics model works by relaxing the dynamic volumes (marked with $^*$ in Table~\ref{tab:cell-volume:volumes-rates}) to their target volumes using their respective volume change rates with a system of ODEs (Equations~\ref{eq:vol-dyn}). Then the other volumes are set as relations of the dynamic volumes. It is important to note that, while the volumes and target volumes are attributes of the Cell Volume class, the volume change rates are not, they are an attribute of the Phase class. We made this separation because how fast a cell changes its volume is a property of its state (Phase in \pcp), therefore the change rates are an attribute of the Phase class. Equations~\ref{eq:vol-dyn} show ODE system governing the dynamic volumes, in those equations the superscript\space\space$tg$\space denotes target. Equations~\ref{eq:vol-rel} show how the other volumes are calculated from the dynamic volumes and each other.
+
+
+% \begin{equation}\label{eq:vol:fluid}
+%     \dift{V_F} = r_F\,\,(f^{tg}_F\times V - V_F)\,\,\,,
+% \end{equation}
+% \begin{equation}\label{eq:vol:nuc-sol}
+%     \dift{V_{NS}} = r_{NS} (V^{tg}_{NS} - V_{NS})\,\,\,,
+% \end{equation}
+% \begin{equation}\label{eq:vol:cyt-sol}
+%     % \dift{V_{CS}} = r_{CS} (V^{tg}_{CS} - V_{CS})\,\,\,,
+%     \dift{V_{CS}} = r_{CS} (f^{tg}_{CN} \times V_{NS} - V_{CS})\,\,\,,
+% \end{equation}
+% \begin{equation}\label{eq:vol:calc-frac}
+%     \dift{f_C} = r_C\,\,(1 - f_C)\,\,\,.
+% \end{equation}
+
+\begin{subequations}\label{eq:vol-dyn}
+    \begin{align}
+        &\dift{V_F} = r_F\,\,(f^{tg}_F\times V - V_F)\,\,\,, \label{eq:vol:fluid} \\
+        &\dift{V_{NS}} = r_{NS} (V^{tg}_{NS} - V_{NS})\,\,\,, \label{eq:vol:nuc-sol} \\
+        &\dift{V_{CS}} = r_{CS} (f^{tg}_{CN} \times V_{NS} - V_{CS})\,\,\,, \label{eq:vol:cyt-sol} \\
+        &\dift{f_C} = r_C\,\,(1 - f_C)\,\,\,. \label{eq:vol:calc-frac}
+    \end{align}
+\end{subequations}
+
+\begin{subequations}\label{eq:vol-rel}
+    \begin{align}
+        &V_{NF} = f_F \times V_N\,\,\,, \label{eq:vol:nuc-fluid}\\
+        &V_{CF} = V_F - V_{NF}\,\,\,,\label{eq:vol:cyt-fluid} \\
+        &V_S = V_{NS} + V_{CS}\,\,\,,\label{eq:vol:solid} \\
+        &V_N = V_{NS} + V_{NF}\,\,\,, \label{eq:vol:nuclear}\\
+        &V_C = V_{CS} + V_{CF\,\,\,,}\label{eq:vol:cyto} \\
+        &V = V_N + V_C\,\,\,,\label{eq:vol:total} \\
+        &f_F = V_F / V\,\,\,,\label{eq:vol:fluid-frac} \\
+        &f_{CN} = V_C / V_N\,\,\,.\label{eq:vol:cn-ratio}
+    \end{align}
+\end{subequations}
+
+\noindent Note that Equation~\ref{eq:vol:calc-frac} implies that the target calcified fraction is always 1, we are adopting this default behavior from PhysiCell~\cite{ghaffarizadeh_physicell_2018}. For most Phases predefined in \pcp\space the calcification rate is zero.
+
+% \begin{figure}[H]
+\begin{figure}[!htpb]
+    \centering
+    \begin{subfigure}{.9\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/phenocell_cellvol_attribs.png}
+        \caption{Cell Volume class attributes and functions}\label{fig:schematics-cellvolume:attr-ops}
+    \end{subfigure}
+    % \label{fig:my_label}
+    \begin{subfigure}{.8\textwidth}
+        \includegraphics[width=\linewidth]{phenocell/figures/phenocell_cellvol_timestep.png}
+        \caption{Cell Volume time-step}\label{fig:schematics-cellvolume:time}
+    \end{subfigure}
+    \caption{Cell Volume class attributes and functions (\ref{fig:schematics-cellvolume:attr-ops}), and Cell Volume update volume (\ref{fig:schematics-cellvolume:time}). The Cell Volume update is highlighted by the black outline. Gray boxes are \pcps classes, yellow rectangles are functions being called, blue parallelograms are information being passed to/from functions, green diamonds are decisions. Yellow arrows mean function call, blue arrows are information being passed.}
+    \label{fig:schematics-cellvolume}
+\end{figure}
+
+\begin{table}[!htb]
+\centering
+\begin{tabular}{cc|cc}
+Volume type                                                           & Symbol     & Change Rate        & Symbol   \\ \hline
+Total                                                                 & $V$        & Fluid              & $r_F$    \\
+Total Nuclear                                                         & $V_N$      & Nuclear Solid      & $r_{NS}$ \\
+Nuclear Solid                                                         & $V^*_{NS}$ & Cytoplasm Solid    & $r_{CS}$ \\
+Nuclear Fluid                                                         & $V_{NF}$   & Calcified Fraction & $r_C$    \\
+Total Cytoplasm                                                       & $V_C$      &                    &          \\
+Cytoplasm Solid                                                       & $V^*_{CS}$ &                    &          \\
+Cytoplasm Fluid                                                       & $V_{CF}$   &                    &          \\
+\begin{tabular}[c]{@{}c@{}}Cytoplasm to \\ nuclear ratio\end{tabular} & $f_{CN}$   &                    &          \\
+Total Fluid                                                           & $V^*_F$    &                    &          \\
+Fluid Fraction                                                        & $f_F$      &                    &          \\
+\begin{tabular}[c]{@{}c@{}}Calcified \\ Fraction\end{tabular}         & $f^*_C$    &                    &         
+\end{tabular}
+\caption{Volumes and volume change rates defined by the Cell Volume class. Volumes marked with $^*$ are the dynamic volumes.}
+\label{tab:cell-volume:volumes-rates}
+\end{table}
+
+% \newpage
+Figure~\ref{fig:schematics-cellvolume} shows the Cell Volume class attributes and functions. It also schematizes how the volume update function works. It uses the volumes attributes from the Cell Volume class together with the volume change rates passed to it by the Phase class to update the volumes of the Cell Volume class.
+
+% \begin{figure}[H]
+%     \centering
+%     \includegraphics[width=.9\linewidth]{phenocell/figures/cellvolume_schematic.png}
+%     \caption{Cell Volume class attributes and functions (left), and schematics of the volume update (right). Blue boxes are classes, blue arrows indicate ownership (\textit{e.g.}, the Phase class owns the Cell Volume class, the Cell Volume class owns the volumes -- see Table~\ref{tab:cell-volume:volumes-rates}), green boxes are class attributes, yellow circle denotes function, yellow arrows are function inputs and outputs.}
+%     \label{fig:schematics-cellvolume}
+% \end{figure}
+
+
+\subsection{Phase Class}\label{sec:meth:phase}
+The phase is the "base unit" of the phenotype. It defines volume change rates, checks for Phase change, and performs phase-specific tasks on phase entry, phase exit and during each time-step.
+
+The phase change check and phase specific tasks are user-definable functions. For flexibility, we impose that all user-definable functions \textbf{must} be able to take any number of arguments as inputs (\textit{i.e.}, be a Python *args function). Otherwise, the way \pcp\space calls those functions would have to change as the number of arguments changes. The user can define their function is such a way that the *args are unused or unnecessary. Our default transition functions and entry/exit functions functions do not use the args. For \pcp's \textit{alpha} version the modeler is responsible for defining, transferring and updating the arguments, creating interface APIs to facilitate this will be included with \pcps by release.
+
+Examples of phase specific tasks are doubling the target volumes when entering the proliferating Phase (see Sections~\ref{sec:predef:ki67-basic} and~\ref{sec:predef:ki67-adv}), or halving the target volumes after division. In-Phase tasks could be checking if the quantity of a nutrient a cell has access to. Figure~\ref{fig:schematics-phase:attr-ops} shows the Phase class attributes and functions, and Figure~\ref{fig:schematics-phase:time} the flowchart for the Phase class time-step.
+
+% \begin{figure}[H]
+%     \centering
+%     \includegraphics[width=.9\linewidth]{phenocell/figures/phenocell_phase_schematics.png}
+%     \caption{Caption}
+%     \label{fig:schematics-phase}
+% \end{figure}
+% \begin{figure}[H]
+\begin{figure}[!htpb]
+    \centering
+    \begin{subfigure}{.7\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/phenocell_phase_schematics.png}
+        \caption{Phase class attributes and functions}\label{fig:schematics-phase:attr-ops}
+    \end{subfigure}
+    % \label{fig:my_label}
+    \begin{subfigure}{.7\textwidth}
+        \includegraphics[width=\linewidth]{phenocell/figures/phenocell_phase_timestep.png}
+        \caption{Phase time-step}\label{fig:schematics-phase:time}
+    \end{subfigure}
+    \caption{Phase class attributes and functions (\ref{fig:schematics-phase:attr-ops}), and Phase time-step flowchart (\ref{fig:schematics-phase:time}). The time-step function is highlighted by the black outline, the order in which it performs operations is overlayed on the arrows. Gray boxes are \pcps classes, yellow rectangles are functions being called, blue parallelograms are information being passed to/from functions, yellow diamonds are decision-making functions. Yellow arrows mean function call, blue arrows are information being passed.}
+    \label{fig:schematics-phase}
+\end{figure}
+
+
+\subsubsection{Phase transition}\label{sec:meth:phase:trans}
+\pcp\space has two pre-defined transition functions that are used by our pre-built models, the deterministic phase transition and the stochastic phase transition. For the deterministic transition the Phase evaluates if the time spent in this Phase ($T$) is greater than the Phase period ($\tau$), Equation~\ref{eq:phase:transition:deter}. For the stochastic case we draw a probability from a Poisson distribution for a single event occurring (Equation~\ref{eq:phase:transition:stoch}). The Poisson probability depends on the time-step length ($dt$) and expected Phase period ($\tau$). We cannot approximate $1 - e^{- dt / \tau}\approx dt/\tau$ in Equation~\ref{eq:phase:transition:stoch}, as we don't know what values of $dt$ and $\tau$ the modeler will use.
+
+\begin{equation}\label{eq:phase:transition:deter}
+    P(A\rightarrow B) = \begin{cases} 1 & \text{if }T > \tau\\
+    0 & \text{else}
+    \end{cases}\,\,.
+\end{equation}
+
+\begin{equation}\label{eq:phase:transition:stoch}
+    P(A\rightarrow B) = 1 - e^{- dt / \tau}\,\,.
+\end{equation}
+
+The user can define their own transition functions that may depend on any number of simulation parameters, \textit{e.g.}, oxygen levels, having a neighboring cell, signaling molecules. One of our CompuCell3D~\cite{swat_multi-scale_2012} examples uses a custom transition function, Ki-67 Basic Cycle Improved Division (Section~\ref{sec:examples:cc3d:ki67-improved}), to ensure cells don't divide early. The custom transition function checks that the in-simulation volume of the simulated cell has reached the doubling volume, Equation~\ref{eq:ki67:transition}.
+
+If the Phase can transition to several Phases (instead of just one), the user can use the transition function to select which Phase to go to.
+
+\subsection{Phenotype Class}\label{sec:meth:pheno}
+The Phenotype is the main concept of PhenoCellPy, in PhenoCellPy "Phenotype" means any sequence of distinct cell behaviors. For instance, a quiescent-proliferating cell cycle is a phenotype with two phases (quiescence, and growth/division); the necrotic phenotype starts with a osmotic swelling phase, followed by dissolution of the cell after it bursts. 
+
+\pcps supports cyclical and acyclical Phenotypes, as well as Phenotypes with an arbitrary sequence of Phases. To facilitate a Phenotype end-point we have defined a method to exit the Phenotype cycle and go into a special senescent Phase. To make use of this functionality, the modeler has to define the optional arrest function which is a member of the Phase class (Section~\ref{sec:meth:phase}). The arrest function is called by the Phase time-step function (Appendix~\ref{sec:meth:phase:step}) and its return value is used by the Phenotype time-step function to exit the Phenotype cycle.
+
+% \begin{figure}[H]
+\begin{figure}[!htpb]
+    \centering
+    \begin{subfigure}{.7\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/phenocell_pheno_attribs.png}
+        \caption{Phenotype class attributes (green box) and functions (yellow box).}\label{fig:schematics-pheno:attr-ops}
+    \end{subfigure}
+    % \label{fig:my_label}
+    \begin{subfigure}{.7\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/phenocell_pheno_timestep.png}
+        \caption{Phenotype time-step}\label{fig:schematics-pheno:time}
+    \end{subfigure}
+    \caption{Phenotype class attributes and functions (\ref{fig:schematics-pheno:attr-ops}), and Phenotype time-step flowchart (\ref{fig:schematics-pheno:time}). The time-step function is highlighted by the black outline, the order in which it performs operations is overlayed on the arrows. Purple hexagon represents the model \pcps is embedded in (\textit{i.e.}, the main model), the gray pentagon is an agent from the main model. Gray boxes are \pcps classes, yellow rectangles are functions being called, blue parallelograms are information being passed to/from functions, green diamonds are decisions. Yellow arrows mean function call, blue arrows are information being passed.}
+    \label{fig:schematics-pheno}
+\end{figure}
+
+The Phenotype class owns the list of all Phases that make it. It switches Phases or goes to the senescent Phase when it receives the respective signals from the Phase time-step, and performs specific user-defined Phenotype tasks each time-step. Figure~\ref{fig:schematics-pheno:attr-ops} shows the Phenotype class attributes and functions, and Figure~\ref{fig:schematics-pheno:time} the flowchart for its time-step.
+
+
+
+\subsection{Using \pcp}\label{sec:meth:how-to-use}
+\pcp's intended use is as an embedded model, meaning it should be loaded into some other modeling platform, \textit{e.g.}, CompuCell3D~\cite{swat_multi-scale_2012}, Tissue Forge~\cite{sego_tissue_2022}. CompuCell3D already supports other modeling frameworks as embedded models, namely SBML~\cite{hucka_systems_2003}, Antimony~\cite{smith_antimony_2009}, and MaBoSS~\cite{stoll_maboss_2017}. 
+
+
+To use \pcp, the modeler has to import \pcps and should initialize a Phenotype object at the simulation start. The Phenotype initialization (in the version of the package at time of writing) takes as arguments: 
+\begin{itemize}\setlength\itemsep{.01em}
+    \item The phenotype name
+    \item Time-step length ($dt$)
+    \item Time and space units
+    \item The list of Phases that make the Phenotype
+    \item Lists for the Phases' target volumes, initial volumes, volume change rates
+    \item The initial volume of the simulated cell
+    \item The starting Phase index
+    \item The senescent Phase
+    \item User-defined Phenotype time-step tasks and initial arguments for them
+    \item List of user-defined phase time-step tasks and initial arguments for them
+\end{itemize}
+\noindent All arguments, except the time-step period, for Phenotype initialization are optional. Listing~\ref{code:pcp:init} show the import and initialization of a pre-built Phenotype.
+
+\begin{listing}[!htb]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+# importing PhenoCellPy
+import PhenoCellPy as pcp
+# defining the time-step period for pcp
+dt = 1
+# initialing a phenotype and saving it to a handle
+ki67_basic = pcp.phenotypes.Ki67Basic(dt=dt)
+\end{minted}
+\caption{Initialization of a pre-built Phenotype using the default argument values explicitly.}\label{code:pcp:init}
+\end{listing}
+
+
+
+\subsubsection{Initialization}\label{sec:meth:how-to-use:init}
+\begin{listing}[H]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+import PhenoCellPy as pcp
+dt = .1  # min, defining the time-step
+# defining the 1st Phase and setting its parameters
+stable_phase_0 = pcp.phases.Phase(index=0, 
+                    previous_phase_index=-1, next_phase_index=1, 
+                    dt=dt, name="stable0", division_at_phase_exit=False, 
+                    removal_at_phase_exit=False, fixed_duration=True, 
+                    phase_duration=10)
+# defining the custom transition function for the 2nd phase
+def grow_phase_transition(*args):
+    # grabbing arguments for clarity
+    volume = args[0]
+    doubling_volume = 0.8 * args[1] # we use a bit less than the 
+    # doubling volume to guarantee a transition
+    time_phase = args[2]
+    phase_duration = args[3]
+    # checking for transition
+    return volume >= doubling_volume and time_phase > phase_duration
+# 2nd Phase, initial args that will fail the check as a safe-guard
+grow_phase = pcp.phases.Ki67Positive(index=1, 
+                previous_phase_index=0, next_phase_index=2, 
+                dt=dt, name="grow", fixed_duration=True, 
+                phase_duration=50, entry_function=None, 
+                entry_function_args=[None],
+                check_transition_to_next_phase_function=\
+                    grow_phase_transition,
+                check_transition_to_next_phase_function_args=\
+                    [0, 9, 0, 9])
+# defining the 3rd Phase
+stable_phase_1 = pcp.phases.Phase(index=2, 
+                    previous_phase_index=1, next_phase_index=3,
+                    dt=dt, name="stable1", fixed_duration=True, 
+                    phase_duration=5)
+\end{minted}
+\caption{Initialization of a custom Phenotype. Part 1.}\label{code:pcp:init-custom}
+\end{listing}
+
+\begin{listing}[H]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+# defining the custom transition function for the 4th phase
+def shrink_phase_transition(*args):
+# saving the arguments to variables for clarity
+    dt = args[0]
+    phase_duration = args[1]
+    total = args[2]
+    total_target = args[3]
+    # doing the transition checks. Stochastic and volume repectively
+    time_check = np.random.uniform() < \ 
+        (1 - np.exp(-dt / phase_duration))
+    volume_check = total <= 1.1 * total_target
+    return time_check and volume_check
+# 4th phase, we use initial args that will fail the check as a safe-guard
+shrink_phase = pcp.phases.Ki67PositivePostMitotic(index=3, 
+                previous_phase_index=2, next_phase_index=0, 
+                dt=dt, name="shrink", phase_duration=100,
+                entry_function=None, entry_function_args=[None], 
+                check_transition_to_next_phase_function= \
+                    shrink_phase_transition,
+                check_transition_to_next_phase_function_args= \
+                    [0, 1, 99, 0])
+# defining the phenotype
+custom_phenotype = pcp.Phenotype(name="oscillate volume with rests", 
+                        dt=dt, 
+                        time_unit="min", space_unit="micrometer", 
+                        phases= \
+                            [custom_p0, custom_p1, 
+                            stable_phase_1, shrink_phase], 
+                    senescent_phase=False, starting_phase_index=0,
+                    user_phenotype_time_step=None,
+                    user_phenotype_time_step_args=[None, ])
+\end{minted}
+\caption{Initialization of a custom Phenotype. Part 2.}\label{code:pcp:init-custom:part2}
+\end{listing}
+
+
+A user can also define their own Phenotype, to do so they have to initialize each constituent Phase of the Phenotype and pass them as a list to the Phenotype object initialization. Listing~\ref{code:pcp:init-custom} and~\ref{code:pcp:init-custom:part2}, shows an example of a custom Phenotype being built, some of the Phases use custom transition functions. The example in Listing~\ref{code:pcp:init-custom} and~\ref{code:pcp:init-custom:part2} only passes the necessary attributes to the classes.
+
+After having initialized the Phenotype the user has to attach it to each agent that will use that Phenotype. How to do this attachment is modeling platform dependent, in CompuCell3D the recommended method is to make the Phenotype a cell dictionary (Listing~\ref{code:pcp:attach-cc3d}), we have created an utility function that does this (Listing~\ref{code:pcp:attach-cc3d:util}). In Tissue Forge recommended method is to have a dictionary with cell ids as keys and Phenotype as items (Listing~\ref{code:pcp:attach-tf}).
+
+\begin{listing}[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+# looping over CC3D cells
+for cell in self.cell_list:
+    # adding a phenotype to the cell dictionary
+    cell.dict["phenotype"] = ki67_basic.copy()
+\end{minted}
+\caption{Attaching a Phenotype to a CompuCell3D cell. Listing~\ref{code:pcp:init} shows the phenotype initialization.}\label{code:pcp:attach-cc3d}
+\end{listing}
+
+\begin{listing}[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+# looping over CC3D cells
+for cell in self.cell_list:
+    # adding a phenotype to the cell using the utility function
+    pcp.utils.add_phenotype_to_CC3D_cell(cell, ki67_basic)
+\end{minted}
+\caption{Attaching a Phenotype to a CompuCell3D cell using \pcp's utility function. Listing~\ref{code:pcp:init} shows the phenotype initialization.}\label{code:pcp:attach-cc3d:util}
+\end{listing}
+
+\begin{listing}[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+# creating an empty dictionary to keep the phenotypes in
+cells_phenotypes = {}
+# looping over TF agents of type Cell
+for cell in Cell.items():
+    # adding the phenotype to the dictionary using the cell id as key
+    cells_phenotypes[f"{cell.id}"] = ki67_basic.copy()
+\end{minted}
+\caption{Attaching a Phenotype to a Tissue Forge cell. Listing~\ref{code:pcp:init} shows the phenotype initialization.}\label{code:pcp:attach-tf}
+\end{listing}
+
+
+% \subsubsection{Continuous tasks}\label{sec:meth:how-to-use:stepping}
+% For each main model agent that has a Phenotype the Phenotype time-step method should be called at every main model time-step. The Phenotype time-step will return boolean flags for cell division, removal from the simulation, and cell death (remember that a dead cell still has a phenotype and may be explicetly represented in the simulation domain, see the necrosis phenotype, Section~\ref{sec:predef:necro}), the user is then responsible for performing tasks based on those flags. For instance, in the CompuCell3D Necrosis Standard example (\yperlink{https://github.com/JulianoGianlupi/PhenoCellPy/tree/main/CC3D_examples/Necrosis}{\textcolor{blue}{see online}}), the CompuCell3D cell changes its cell type (see~\cite{swat_multi-scale_2012} for a definition of cell type in \ccd) when changing from the "osmotic swell" Phase to the "lysed" Phase (see Section~\ref{sec:predef:necro} for information about the pre-built necrosis Phenotype). Listing~\ref{code:pcp:step} shows a generic implementation of continuous \pcps tasks in a \ccds simulation.
+
+% \begin{listing}[!ht]
+% \begin{minted}[
+% frame=lines,
+% framesep=2mm,
+% baselinestretch=1.2,
+% %bgcolor=light-gray,
+% fontsize=\footnotesize,
+% linenos
+% ]{python}
+% dividing_cells = []
+% for cell in self.cell_list:
+%     changed_phase, should_be_removed, divides = \
+%             cell.dict["phenotype"].time_step_phenotype()
+%     if changed_phase:
+%         self.phase_change_tasks(cell)
+%     if should_be_removed:
+%         self.delete_cell(cell)
+%     if divides:
+%         dividing_cells.append(cell)
+% for cell in dividing_cells:
+%     self.divide_cell_random_orientation(cell)
+% \end{minted}
+% \caption{Example implementation of continuous \pcps tasks in \ccd.}\label{code:pcp:step}
+% \end{listing}
+
+\newpage
+\section{Pre-defined Phenotypes}\label{sec:predef}
+\input{phenocell/pre_def_phenos.tex}
+
+\section{Selected Examples}\label{sec:examples}
+
+
+\input{phenocell/examples.tex}
+
+% \subsection{Tissue Forge}\label{sec:examples:tf}
+\newpage
+\section{Selected Results}\label{sec:res}
+
+In this section, we will present selected results from some of the pre-built CompuCell3D and Tissue Forge examples.
+
+\subsection{CompuCell3D}\label{sec:res:cc3d}
+
+\subsubsection{Ki-67 Basic Cycle}\label{sec:res:cc3d:division}
+
+\begin{figure}[!htbp]
+    \centering
+    \begin{subfigure}{.32\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/cc3d/ki67basic/Cell_Field_CellField_2D_XY_0_000100.png}
+        \caption{}\label{fig:res:cc3d:ki67basic:space:0}
+    \end{subfigure}
+    \begin{subfigure}{.32\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/cc3d/ki67basic/Cell_Field_CellField_2D_XY_0_002000.png}
+        \caption{}\label{fig:res:cc3d:ki67basic:space:2000}
+    \end{subfigure}
+    \begin{subfigure}{.32\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/cc3d/ki67basic/Cell_Field_CellField_2D_XY_0_004000.png}
+        \caption{}\label{fig:res:cc3d:ki67basic:space:4000}
+    \end{subfigure}
+    \begin{subfigure}{.32\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/cc3d/ki67basic/zoom.png}
+        \caption{}\label{fig:res:cc3d:ki67basic:space:4000:zoom}
+    \end{subfigure}
+    \begin{subfigure}{.32\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/cc3d/ki67basic/phase_mcs_2800.png}
+        \caption{}\label{fig:res:cc3d:ki67basic:space:phase}
+    \end{subfigure}
+    % \includegraphics{}
+    \caption{Spatial figures for the \ccds simulation using the regular Ki-67 Basic cycle. a, b, and c) shows the cell cluster with no color overlay. They show the cluster at the start of the simulation, step 2000 and step 4000 respectively. d) Zoom in on the center of image c. e) Color coded cells based on the phase they are in, green for the quiescent phase and red for the proliferating phase. Step 2800.}
+    \label{fig:res:cc3d:ki67basic:space}
+\end{figure}
+
+We ran the regular Ki-67 Basic cycle (see Section~\ref{sec:predef:ki67-basic}) and compared it to the Ki-67 Basic cycle improved division (see Section~\ref{sec:examples:cc3d:ki67-improved}) in \ccd. The simulation here is 2D. In this simulation we start with single cell with a volume of 100 pixels (the pixel to $\mu m$ conversion is set to $24.94 \mu m/pixel$), therefore they should reach 200 pixels before division. We are using a time-step of $5min/step$, the usual name for the time-step in \ccd, for historical reasons, is Monte-Carlo Step (MCS).
+With the regular cycle We see that the median and minimum cell volumes go down in time (Figure~\ref{fig:res:cc3d:ki67basic:graphs:vol}), that happens because the mitotic phase transition happens after a set amount of time no matter the cell volume. As cells grow slowly in \ccds they end up being halved before reaching their doubling volume. We see that this effect is worse towards the center of the cell cluster (see Figure~\ref{fig:res:cc3d:ki67basic:space:4000:zoom}), as those cells don't have room to grow at all. In Figure~\ref{fig:res:cc3d:ki67basic:space:4000:zoom} we can see that many cells are only a few pixels big. We also see that the spatial phase distribution is random in space (see Figure~\ref{fig:res:cc3d:ki67basic:space:phase}).
+
+
+\begin{figure}[!htbp]
+    \centering
+    \begin{subfigure}{.9\linewidth}
+        \includegraphics[width=\linewidth]{phenocell/figures/results/cc3d/ki67basic/population.png}
+        \caption{}\label{fig:res:cc3d:ki67basic:graphs:pop}
+    \end{subfigure}
+    % \\
+    \begin{subfigure}{.9\linewidth}
+        \includegraphics[width=\linewidth]{phenocell/figures/results/cc3d/ki67basic/volume.png}
+        \caption{}\label{fig:res:cc3d:ki67basic:graphs:vol}
+    \end{subfigure}
+    \caption{Statistics for the cell population in \ccds using the standard Ki-67 Basic cycle. a) Total cell population. b) Cell population volume statistics. Maximum cell volume in red, median in yellow, and minimum in blue.}
+    \label{fig:res:cc3d:ki67basic:graphs}
+\end{figure}
+
+
+In contrast, when using the modified transition we account for the simulated cell volume. Now the reduction in the median volume is small and happens due to overcrowding and cells pushing each other, and that the total population growth was much smaller (3800 cells at step 4000, see Figure~\ref{fig:res:cc3d:ki67mod:graphs:pop}, versus 19000, see Figure~\ref{fig:res:cc3d:ki67basic:graphs:pop}). We do not see overly small cells (see Figure~\ref{fig:res:cc3d:ki67basic:space:4000:zoom}). We also see that cells towards the center of the cell cluster stay in the proliferating phase (see Figure~\ref{fig:res:cc3d:ki67mod:space:phase}), unable to reach their doubling volume and divide.
+
+\begin{figure}[!htbp]
+    \centering
+    \begin{subfigure}{.32\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/cc3d/ki67mod/Cell_Field_CellField_2D_XY_0_000100.png}
+        \caption{}\label{fig:res:cc3d:ki67mod:space:0}
+    \end{subfigure}
+    \begin{subfigure}{.32\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/cc3d/ki67basic/Cell_Field_CellField_2D_XY_0_002000.png}
+        \caption{}\label{fig:res:cc3d:ki67mod:space:2000}
+    \end{subfigure}
+    \begin{subfigure}{.32\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/cc3d/ki67mod/Cell_Field_CellField_2D_XY_0_004000.png}
+        \caption{}\label{fig:res:cc3d:ki67mod:space:4000}
+    \end{subfigure}
+
+     \begin{subfigure}{.32\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/cc3d/ki67mod/zoom-mod.png}
+        \caption{}\label{fig:res:cc3d:ki67mod:space:4000:zoom}
+    \end{subfigure}
+    \begin{subfigure}{.32\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/cc3d/ki67mod/phase_mcs3200.png}
+        \caption{}\label{fig:res:cc3d:ki67mod:space:phase}
+    \end{subfigure}
+    % \includegraphics{}
+    \caption{Spatial figures for the \ccds simulation using the regular Ki-67 Basic cycle. a, b, and c) shows the cell cluster with no color overlay. They show the cluster at the start of the simulation, step 2000 and step 4000 respectively. d) Zoom in on the center of image c. e) Color coded cells based on the phase they are in, green for the quiescent phase and red for the proliferating phase. Step 3200.}
+    \label{fig:res:cc3d:ki67mod:space}
+\end{figure}
+
+
+\begin{figure}[!htbp]
+    \centering
+    \begin{subfigure}{.9\linewidth}
+        \includegraphics[width=\linewidth]{phenocell/figures/results/cc3d/ki67mod/mod-population.png}
+        \caption{}\label{fig:res:cc3d:ki67mod:graphs:pop}
+    \end{subfigure}
+    % \\
+    \begin{subfigure}{.9\linewidth}
+        \includegraphics[width=\linewidth]{phenocell/figures/results/cc3d/ki67mod/mod-volume.png}
+        \caption{}\label{fig:res:cc3d:ki67mod:graphs:vol}
+    \end{subfigure}
+    \caption{Statistics for the cell population in \ccds using the modified Ki-67 Basic cycle. a) Total cell population. b) Cell population volume statistics. Maximum cell volume in red, median in yellow, and minimum in blue.}
+    \label{fig:res:cc3d:ki67mod:graphs}
+\end{figure}
+
+\subsubsection{Necrosis standard}\label{sec:res:cc3d:necro}
+
+
+\begin{figure}[!htbp]
+    \centering
+    \begin{subfigure}{.35\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/cc3d/necro/Cell_Field_CellField_2D_XY_0_000050.png}
+        \caption{}\label{fig:res:cc3d:necro:space:0}
+    \end{subfigure}
+    \begin{subfigure}{.35\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/cc3d/necro/Cell_Field_CellField_2D_XY_0_003720.png}
+        \caption{}\label{fig:res:cc3d:necro:space:swollen}
+    \end{subfigure}
+    \begin{subfigure}{.35\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/cc3d/necro/Cell_Field_CellField_2D_XY_0_003730.png}
+        \caption{}\label{fig:res:cc3d:necro:space:burst}
+    \end{subfigure}
+    \begin{subfigure}{.35\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/cc3d/necro/Cell_Field_CellField_2D_XY_0_006730.png}
+        \caption{}\label{fig:res:cc3d:necro:space:end}
+    \end{subfigure}
+    \caption{Snapshots of the \ccds simulation for the necrotic phenotype, necrotic cells in green, healthy cells in blue, fragmented cells in red. a) simulation start. b) Necrotic cells at maximum volume. c) Moment the necrotic cells bursts. d) end of the simulation.}
+    \label{fig:res:cc3d:necro:space}
+\end{figure}
+
+
+We ran the necrotic phenotype in a 2D \ccds simulation, we simulate 170 cells plated in a petri dish. We select ten of those cells to undergo necrosis. We keep the initial volume of the cells 100 pixels (with the same pixel to $\mu m$ relation) and the same time-step duration of $5min/step$. The necrotic cells increase in volume linearly (see Figure~\ref{fig:res:cc3d:necro:graph}) during the hydropic (osmotic) swell phase until they reach their bursting volume. After bursting (see Figure~\ref{fig:res:cc3d:necro:space}) their volume decreases rapidly at first, going near zero almost immediately, and then keeps decreasing more slowly (see Figure~\ref{fig:res:cc3d:necro:graph}). This happens because the \pcps model sets the target volume of the cell to 0 when entering the ruptured phase, however, \ccds works by minimizing the energy of the system, and the cell fragments have a negative contact energy with the medium (see \ccd's~\cite{swat_multi-scale_2012} manuals for a definition of the contact energy).
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=.6\linewidth]{phenocell/figures/results/cc3d/necro/volume.png}
+    \caption{Necrotic cells volumes evolution in time. Each necrotic cell volume is plotted individuality}
+    \label{fig:res:cc3d:necro:graph}
+\end{figure}
+
+\subsection{Tissue Forge}\label{sec:res:tf}
+
+
+
+\subsubsection{Ki-67 Basic Cycle}\label{sec:res:tf:ki67}
+
+\begin{figure}[!htbp]
+    \centering
+    \begin{subfigure}{.32\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/TF/beg-space.png}
+        \caption{}\label{fig:res:tf:space:beg}
+    \end{subfigure}
+    \begin{subfigure}{.32\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/TF/mid-space.png}
+        \caption{}\label{fig:res:tf:space:mid}
+    \end{subfigure}
+    \begin{subfigure}{.32\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/TF/end-space.png}
+        \caption{}\label{fig:res:tf:space:end}
+    \end{subfigure}
+    \caption{Cells space configuration in the Tissue Forge Ki-67 Basic cycle model. a) Simulation start. b) Day 7. c) Day 15 (simulation end).}
+    \label{fig:res:tf:space}
+\end{figure}
+
+For the Tissue Forge Ki-67 Basic Cycle simulation we used a time-step duration of 10 min/step, as Tissue Forge is off-lattice we don't need a space conversion factor. This simulation is 3D, and we see that the cell cluster at the center (see Figure~\ref{fig:res:tf:space}).
+
+Unlike in \ccds, cells in Tissue Forge are soft spheres and can reach their desired volume almost instantly. Therefore, we don't need the modification to the division transition. The median and minimum cell volume stay steady (see Figure~\ref{fig:res:tf:graph:vol}). The median cell volume stays close to the maximum cell volume (see Figure~\ref{fig:res:tf:graph:vol}) because the cells double in volume very fast in Tissue Forge, the cells then stay at their doubling volume until the phase duration has transpired. As before, the population growth is exponential (see Figure~\ref{fig:res:tf:graph:pop}).
+
+\begin{figure}[!htbp]
+    \centering
+    \begin{subfigure}{.45\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/TF/pop.png}
+        \caption{}\label{fig:res:tf:graph:pop}
+    \end{subfigure}
+    \begin{subfigure}{.45\textwidth}
+        \includegraphics[width=\textwidth]{phenocell/figures/results/TF/volume.png}
+        \caption{}\label{fig:res:tf:graph:vol}
+    \end{subfigure}
+    \caption{Cell population statistics for the Tissue Forge model using \pcp's Ki-67 Basic Cycle phenotype. a) Total cell population. b) Cells' volume statistic.}
+    \label{fig:res:tf:graph}
+\end{figure}
+
+
+
+
+
+\section{Discussion}
+
+The \pcp's embedded modeling package allows modelers to easily create sequences of cell behaviors and attach them to agent in agent-based models. \pcps is accessible, intuitive and enables modelers to add complexity to their model without much overhead. It implements several biological concepts, such as how to switch from one behavior to the next, how the different volumes of the cell should be modeler (\textit{e.g.,} cytoplasmic and nuclear), and makes sure time-scales are respected. \pcps also makes the creation of new behaviors and sequences of behaviors easy.
+
+\pcps is open-source and freely available under the BSD 3-Clause License \\*(\textcolor{blue}{\url{https://github.com/JulianoGianlupi/PhenoCellPy/blob/main/LICENSE}}).
+
+\subsection{Installation}\label{sec:install}
+PhenoCellPy's \textit{alpha} version does not have any installer. To use it you should clone or download its GitHub repository~\cite{gianlupi_phenocellpy_2022} and add its folder to the simulation's system path. E.g., see Listing~\ref{code:install}.
+
+
+\begin{listing}[!htpb]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+%bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+import sys
+sys.path.extend(['C:\\PhenoCellPy_Dowload_Folder', 
+'C:/PhenoCellPy_Dowload_Folder'])
+\end{minted}
+\caption{How to add PhenoCellPy to the simulation's system path.}\label{code:install}
+\end{listing}
+
+% \begin{python}\label{code:install}
+% import sys
+% sys.path.extend(['C:\\PhenoCellPy_Dowload_Folder', 'C:/PhenoCellPy_Dowload_Folder'])
+% \end{python}
+
+
+\subsection{Planned features}
+We currently have these planned features:
+\begin{itemize}\setlength\itemsep{.01em}
+    \item Interface (API) classes for CompuCell3D and Tissue Forge
+    \item Template interface classes
+    \item Automatic inter-cell heterogeneity~\cite{ferrari_gianlupi_multiscale_2022}
+    \item Randomization of the initial Phase of the Phenotype
+    \item Conda or pip distribution
+    \item API for environment interaction (\textit{e.g.}, detection of oxygen levels in the environment, detection of neigboring cells)
+    \item "Super-Phenotypes," phenotypes made from more than one Phenotype class, and methods for switching between them
+\end{itemize}
+
+\subsection{Requirements}
+PhenoCellPy only requirements, besides Python 3 support, are that NumPy and SciPy be available inside the modeling framework \pcp is embedded in.
+
+
+
+

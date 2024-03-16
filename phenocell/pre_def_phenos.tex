@@ -1,0 +1,92 @@
+PhenoCellPy comes with several pre-packadged Phenotypes defined. As with the Methods Section (Section~\ref{sec:meth}), we've removed most docstrings and comments from code presented in this Section. 
+
+\subsection{Simple Live Cycle}\label{sec:predef:simp-live}
+Simplest Phenotype defined, it is a cell-cycle Phenotype of one single Phase. The transition from one Phase to the next (which is the same Phase) is stochastic with an expected duration of $\approx23h$, the expected cycle time for a MCF-10A cell line cell~\cite{noauthor_mcf-10a_nodate}. %As it is a cell cycle, the cell should divide with the Phase change.
+
+% \begin{python}\label{code:predef:simp}
+% class SimpleLiveCycle(Phenotype):
+%     """
+%     Inherits :class:`Phenotype`. Simplest alive cycle, it has only one phase. 
+%     When progressing to the "next" phase the cell should divide.
+%     """
+%     def __init__(self, time_unit: str = "min", name: str = "Simple Live", dt=1):
+%         phases = [
+%             Phases.Phase(index=0, previous_phase_index=0, next_phase_index=0, dt=dt,
+%                 time_unit=time_unit, name="alive", division_at_phase_exit=True, 
+%                 phase_duration=60 / 0.0432)]
+%         super().__init__(name=name, dt=dt, time_unit=time_unit, phases=phases, 
+%             quiescent_phase=False)
+% \end{python}
+
+\subsection{Ki-67 Basic}\label{sec:predef:ki67-basic}
+The Ki-67 Basic is a two Phase cell-cycle phenotype, it matches experimental data that uses Ki-67, a protein marker for cell proliferation~\cite{mckeown_defining_2014}. A cell with a positive Ki-67 marker is in its proliferating state, if there's no Ki-67 it is in quiescence.
+
+The quiescent Phase (Ki-67 negative) uses an expected Phase duration of $4.59h$, transition from this Phase is set to be stochastic. The proliferating Phase (Ki-67 positive) uses a fixed duration (\textit{i.e.}, the transition is deterministic) of $15.5h$. We utilize the same reference values for Phase durations as PhysiCell~\cite{ghaffarizadeh_physicell_2018}. 
+
+
+\subsection{Ki-67 Advanced}\label{sec:predef:ki67-adv}
+Ki-67 Advanced adds a post-mitosis Phase to represent the time it takes Ki-67 to degrade post cell division. The proliferating Phase and Ki-67 degradation Phase are both deterministic, with durations of $13h$ and $2.5h$, respectively. The quiescent (Ki-67 negative) Phase uses the stocastic transition, with an expected duration of $3.62h$. Again, we utilize the same reference values for Phase durations as PhysiCell~\cite{ghaffarizadeh_physicell_2018}. 
+
+\subsection{Flow Cytometry Basic}\label{sec:predef:flow-basic}
+Flow Cytometry Basic is a three Phase live cell cycle. It represents the $G0/G1 \rightarrow S \rightarrow G2/M \rightarrow G0/G1$ cycle. The $G0/G1$ phase is more representative of the quiescent phase than the first growth phase, as no growth occurs in this Phase. The Phenotype transitions stochastically from this phase, its expected duration is $5.15h$. The $S$ phase is the phase responsible for doubling the cell volume, transition to the next phase is stochastic, its expected duration is $8h$. The cell volume growth rate is set to be [total volume growth]/[phase duration]. The G2/M is the pre-mitotic rest phase, the cell divides when exiting this phase. Transition to the next phase is stochastic, its expected duration is 5h. Reference phases durations are from "The Cell: A Molecular Approach. 2nd edition"~\cite{cooper_eukaryotic_2000}.
+
+\subsection{Flow Cytometry Advanced}\label{sec:predef:flow-adv}
+Flow Cytometry Advanced is a four Phase live cell cycle. It represents the $G0/G1 \rightarrow S \rightarrow G2 \rightarrow M \rightarrow G0/G1$ cycle. The behaviors The mechanics of the Phases are the same as in Flow Cytometry Basic (Section~\ref{sec:predef:flow-basic}) with an added rest Phase (the separation of $G2$ from $M$). All Phase transitions are stochastic, and their expected durations are: $4.98h$, $8h$, $4h$, and $1h$, respectively. Cell division occurs when exiting Phase $M$. 
+
+\subsection{Apoptosis Standard}\label{sec:predef:apopto}
+Apoptosis Standard is a single Phase dead Phenotype. The cell in this Phenotype sets $V^{tg}_{NS}=0$, $f^{tg}_{CN}=0$, and $f_F=0$ on Phase entry. By doing this, the cell will diminish in volume until it disappears, the rate used for the cytoplasm reduction is  $r_{CS}=1/60\,\,\mu m^3/min$, for the nucleus it is $r_{NS}=0.35/60\,\,\mu m^3/min$, and the fluid change rate is $r_F=3/60\,\,\mu m^3/min$, volume change rates reference values from~\cite{macklin_patient-calibrated_2012,macklin_modeling_2013}. This Phenotype Phase uses a fixed duration of $8.6h$, the simulated cell should be removed from the simulation domain when the Phase ends.
+
+\subsection{Necrosis Standard}\label{sec:predef:necro}
+Necrosis Standard is a two Phase dead Phenotype. The first phase represents the osmotic swell of a necrotic cell, it doesn't have a set or expected phase duration, instead it uses a custom transition function that monitors the cell volume and transition to the next phase happens when the cell total volume ($V_T$) reaches its rupture volume ($V_R$), set to be twice the original volume by default, see Equation~\ref{eq:necro-swell:transition} and Listing~\ref{code:necro:trans}. On Phase entry, the solid volumes targets are set to zero (\textit{i.e.}, $V^{tg}_{CS}=V^{tg}_{NS}=0\mu m$), the target fluid fraction is set to one ($f_{F}^{tg}=1$), and the target cytoplasm to nuclear ratio is set to zero ($f^{tg}_{CN}=0$). These changes cause the cell to swell. The rates of volume change are: solid cytoplasm $r_{CS} = 3.2 / 60 \times 10^{-3}\,\,\mu m^3/min$, solid nucleus $r_{NS}=1.3 / 60\times 10^{-2}\,\,\mu m^3/min$, fluid fraction $r_F=6.7/60\times 10^{-1}\,\,\mu m^3/min$, calcified fraction $r_C=4.2 / 60\times 10^{-3}\,\,\mu m^3/min$. 
+
+The second Phase represents the ruptured cell, it is up to the modeler and modeling framework how the ruptured cell should be represented. For instance, in Tissue Forge~\cite{sego_tissue_2022} the ruptured cell should become several fragment agents, whereas in CompuCell3D~\cite{swat_multi-scale_2012} the fragmentation can be achieved by setting the ruptured cell contact energy with the medium to be negative. The cell fragments shrink and dissolve into the medium. As a safeguard, this Phase uses a deterministic transition time of 60 days, after which the fragments are flagged for removal. On Phase entry all target volumes are set to zero. The volume change rates are: solid cytoplasm $r_{CS} = 3.2 / 60 \times 10^{-3}\,\,\mu m^3/min$, solid nucleus $r_{NS}=1.3 / 60\times 10^{-2}\,\,\mu m^3/min$, fluid fraction $r_F=5/60\times 10^{-1}\,\,\mu m^3/min$, calcified fraction $r_C=4.2 / 60\times 10^{-3}\,\,\mu m^3/min$. 
+
+\begin{equation}\label{eq:necro-swell:transition}
+    P(\text{Swelling}\rightarrow\text{Ruptured}) = \begin{cases} 1 & \text{if }V_T > V_R\\
+    0 & \text{else}
+    \end{cases}\,\,.
+\end{equation}
+
+
+\begin{listing}[!htpb]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+% bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def _necrosis_transition_function(self, *none):
+    """
+    Custom phase transition function. The simulated cell should only 
+    change phase once it bursts (i.e., when its volume is above the
+    rupture volume), it cares not how long or how little time it 
+    takes to reach that state.
+    
+    :param none: Not used. This is a custom transition function, 
+    therefore it has to have args, i.e., the function implements 
+    the PhenoCellPy interface
+    
+    :return: Flag for phase transition
+    :rtype: bool
+    """
+    return self.volume.total > self.volume.rupture_volume
+\end{minted}
+\caption{Necrotic Standard's osmotic swelling Phase transition function.}\label{code:necro:trans}
+\end{listing}
+
+% \begin{python}\label{code:necro:trans}
+%     def _necrosis_transition_function(self, *none):
+%         """
+%         Custom phase transition function. The simulated cell should only change phase once 
+%         it bursts (i.e., when its volume is above the rupture volume), it cares not how
+%         long or how little time it takes to reach that state.
+%         :param none: Not used. This is a custom transition function, therefore it has 
+%             to have args
+%         :return: Flag for phase transition
+%         :rtype: bool
+%         """
+%         return self.volume.total > self.volume.rupture_volume
+% \end{python}
+% \end{listing}

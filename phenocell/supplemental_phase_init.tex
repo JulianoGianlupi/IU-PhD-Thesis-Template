@@ -1,0 +1,125 @@
+% \newpage
+\section{Phase init function}\label{suplemental:phase:init}
+\begin{python}\label{code:pheno:init}
+def __init__(self, index: int = None, previous_phase_index: int = None,
+    next_phase_index: int = None, dt: float = None, 
+    time_unit: str = "min", name: str = None, 
+    division_at_phase_exit: bool = False, 
+    removal_at_phase_exit: bool = False, fixed_duration: bool = False, 
+    phase_duration: float = 10, entry_function=None, 
+    entry_function_args: list = None,
+    exit_function=None, exit_function_args: list = None, 
+    arrest_function=None,
+    arrest_function_args: list = None, transition_to_next_phase=None,
+    transition_to_next_phase_args: list = None, 
+    simulated_cell_volume: float = None, 
+    cytoplasm_volume_change_rate=None,
+    nuclear_volume_change_rate=None, calcification_rate=None, 
+    target_fluid_fraction=None, nuclear_fluid=None, nuclear_solid=None,
+    nuclear_solid_target=None, cytoplasm_fluid=None, 
+    cytoplasm_solid=None, 
+    cytoplasm_solid_target=None, target_cytoplasm_to_nuclear_ratio=None,
+    calcified_fraction=None, fluid_change_rate=None, 
+    relative_rupture_volume=None):
+    
+    if index is None:
+        self.index = 0
+    else:
+        self.index = index
+    self.previous_phase_index = previous_phase_index
+    self.next_phase_index = next_phase_index
+    self.time_unit = time_unit
+    if dt is None or dt <= 0:
+        raise ValueError(f"'dt' must be greater than 0. Got {dt}.")
+    self.dt = dt
+    if name is None:
+        self.name = "unnamed"
+    else:
+        self.name = name
+    self.division_at_phase_exit = division_at_phase_exit
+    self.removal_at_phase_exit = removal_at_phase_exit  
+    self.fixed_duration = fixed_duration
+    if phase_duration <= 0:
+        raise ValueError(f"'phase_duration' must be greater than 0."
+                         f" Got {phase_duration}")
+    self.phase_duration = phase_duration
+    self.time_in_phase = 0
+    self.entry_function = entry_function  
+    self.entry_function_args = entry_function_args
+    self.exit_function = exit_function
+    self.exit_function_args = exit_function_args
+    if self.exit_function is not None and \ 
+        not (type(self.exit_function_args) == list or
+             type(self.exit_function_args) == tuple):
+        raise TypeError("Exit function defined but no args given. "
+                        f"Was expecting "
+                        f"'exit_function_args' to be a list or tupple,"
+                        f" got {type(exit_function_args)}.")
+
+    self.arrest_function = arrest_function
+    self.arrest_function_args = arrest_function_args
+    if self.arrest_function is not None and \ 
+      type(self.arrest_function_args) != list:
+        raise TypeError("Arrest function defined but no args given."
+                        "Was expecting "
+                        f"'arrest_function_args' to be a list,"
+                        f"got {type(arrest_function_args)}.")
+
+    if transition_to_next_phase is None:
+        self.transition_to_next_phase_args = [None]
+        if fixed_duration:
+            self.transition_to_next_phase = \ 
+                self._transition_to_next_phase_deterministic
+        else:
+            self.transition_to_next_phase = \ 
+                self._transition_to_next_phase_stochastic
+    else:
+        if type(transition_to_next_phase_args) != list:
+            raise TypeError("Custom exit function selected but no args "
+                            "given. Was expecting "
+                            "'transition_to_next_phase_args' to be a"
+                            " list, got "
+                            f"{type(transition_to_next_phase_args)}.")
+        self.transition_to_next_phase_args = \ 
+            transition_to_next_phase_args
+        self.transition_to_next_phase = transition_to_next_phase
+    if simulated_cell_volume is None:
+        self.simulated_cell_volume = 1
+    else:
+        self.simulated_cell_volume = simulated_cell_volume
+
+    # the default rates are reference values for MCF-7, in 1/min
+    if cytoplasm_volume_change_rate is None:
+        self.cytoplasm_volume_change_rate = 0.27 / 60.0
+    else:
+        self.cytoplasm_volume_change_rate = cytoplasm_volume_change_rate
+    if nuclear_volume_change_rate is None:
+        self.nuclear_volume_change_rate = 0.33 / 60.0
+    else:
+        self.nuclear_volume_change_rate = nuclear_volume_change_rate
+    if calcification_rate is None:
+        self.calcification_rate = 0
+    else:
+        if calcification_rate < 0:
+            raise ValueError(f"`calcification_rate` must be >= 0,"
+                             f" got {calcification_rate}")
+        self.calcification_rate = calcification_rate
+    if fluid_change_rate is None:
+        self.fluid_change_rate = 3.0 / 60.0
+    else:
+        self.fluid_change_rate = fluid_change_rate
+    self.volume = \ 
+        CellVolumes(
+            target_fluid_fraction=target_fluid_fraction,
+            nuclear_fluid=nuclear_fluid, 
+            nuclear_solid=nuclear_solid, 
+            nuclear_solid_target=nuclear_solid_target,
+            cytoplasm_fluid=cytoplasm_fluid, 
+            cytoplasm_solid=cytoplasm_solid,
+            cytoplasm_solid_target=cytoplasm_solid_target,
+            target_cytoplasm_to_nuclear_ratio=
+                target_cytoplasm_to_nuclear_ratio, 
+            calcified_fraction=calcified_fraction,
+            relative_rupture_volume=relative_rupture_volume)
+
+\end{python}

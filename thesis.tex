@@ -2,17 +2,38 @@
 % Document type, global settings, and packages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
 \documentclass[12pt]{report}   %12 point font for Times New Roman
+\usepackage[utf8]{inputenc}
 \usepackage{graphicx}  %for images and plots
 \usepackage[letterpaper, left=1.5in, right=1in, top=1in, bottom=1in]{geometry}
 \usepackage[doublespacing]{setspace}  %use this package to set linespacing as desired
 \usepackage{times}  %set Times New Roman as the font
 \usepackage[explicit]{titlesec}  %title control and formatting
 \usepackage[titles]{tocloft}  %table of contents control and formatting
-\usepackage[backend=bibtex, sorting=none]{biblatex}  %reference manager
-\usepackage[bookmarks=true, hidelinks]{hyperref}
-\usepackage[page]{appendix}  %for appendices
+\usepackage[backend=bibtex, sorting=none, sortcites=true, style=numeric-comp]{biblatex}  %reference manager
+\usepackage[bookmarks=true, hidelinks, breaklinks=true]{hyperref}
+% \usepackage[page]{appendix}  %for appendices
+\usepackage{appendix}  %for appendices
 \usepackage{rotating}  %for rotated, landscape images
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{float}
+
+\usepackage{subcaption}
+
+\usepackage{pythonhighlight}
+\usepackage{minted}
+
+\usepackage{letltxmacro}
+
+% \usepackage{cite}
+
+
+\usepackage{multicol}
+
+\usepackage{epigraph}
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Bibliography
@@ -33,6 +54,9 @@
 \AtEveryBibitem{\clearfield{url}}
 \AtEveryBibitem{\clearlist{url}}
 
+\AtEveryBibitem{\clearfield{note}}
+\AtEveryBibitem{\clearlist{note}}
+
 \AtEveryBibitem{%
   \ifentrytype{online}
     {}
@@ -41,6 +65,46 @@
 %%%%%%%%%%%%%%%%%%%%%%
 % Start of Document
 %%%%%%%%%%%%%%%%%%%%%%
+% \renewcommand{\appendixpagename}{\textbf{\appendixpagename}}
+\makeatletter
+% \renewcommand{\@chap@pppage}{%
+%   \clear@ppage
+%   \thispagestyle{plain}%
+%   \if@twocolumn\onecolumn\@tempswatrue\else\@tempswafalse\fi
+%   \null\vfil
+%   \markboth{}{}%
+%   {\centering
+%    \interlinepenalty \@M
+%    \normalfont
+%    \MakeUppercase \appendixpagename\par}%
+%   \if@dotoc@pp
+%     \addappheadtotoc
+%   \fi
+%   \vfil\newpage
+%   \if@twoside
+%     \if@openright
+%       \null
+%       \thispagestyle{empty}%
+%       \newpage
+%     \fi
+%   \fi
+%   \if@tempswa
+%     \twocolumn
+%   \fi
+% }
+\renewcommand{\@chap@pppage}{%
+    \clear@ppage
+    \thispagestyle{plain}%
+    \if@twocolumn\onecolumn\@tempswatrue\else\@tempswafalse\fi
+    \null\vfil
+    \markboth{}{}%
+    {\centering
+    \interlinepenalty \@M
+    \normalfont
+    \bfseries \appendixpagename\par
+    }
+}
+\makeatother
 
 \begin{document}
 %\doublespacing  %set line spacing
@@ -112,6 +176,13 @@
 \begin{singlespace}
 \tableofcontents
 \end{singlespace}
+\expandafter\def\expandafter\UrlBreaks\expandafter{\UrlBreaks%  save the current one
+  \do\a\do\b\do\c\do\d\do\e\do\f\do\g\do\h\do\i\do\j%
+  \do\k\do\l\do\m\do\n\do\o\do\p\do\q\do\r\do\s\do\t%
+  \do\u\do\v\do\w\do\x\do\y\do\z\do\A\do\B\do\C\do\D%
+  \do\E\do\F\do\G\do\H\do\I\do\J\do\K\do\L\do\M\do\N%
+  \do\O\do\P\do\Q\do\R\do\S\do\T\do\U\do\V\do\W\do\X%
+  \do\Y\do\Z\do\/\do\:}
 
 
 \clearpage
@@ -127,13 +198,72 @@
 \end{singlespace}
 
 \clearpage
-
+\setlength{\cftfignumwidth}{1.25cm}
 \phantomsection
 \addcontentsline{toc}{chapter}{List of Figures}
 \begin{singlespace}
 \setlength\cftbeforefigskip{\baselineskip}  %manually set spacing between entries
 \listoffigures
 \end{singlespace}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% COMMANDS
+% \hypersetup{
+%     colorlinks=true,
+%     linkcolor=blue}
+
+\renewcommand{\textit}[1]{\emph{#1}}
+% \renewcommand{\listingscaption}{Code}
+
+\definecolor{light-gray}{gray}{0.95}
+\newcommand{\code}[1]{\colorbox{light-gray}{\texttt{#1}}}
+
+
+\newcommand{\dif}[2]{\frac{d#1}{d#2}}
+\newcommand{\dift}[1]{\dif{#1}{t}}
+
+\newcommand{\pde}[2]{\frac{\partial#1}{\partial#2}}
+\newcommand{\pdet}[1]{\pde{#1}{t}}
+
+
+\newcommand{\pcp}{PhenoCellPy}
+\newcommand{\pcps}{\pcp\space}
+
+\newcommand{\ccd}{CompuCell3D}
+\newcommand{\ccds}{\ccd\space}
+
+\newcommand{\psc}{PhysiCell}
+\newcommand{\pscs}{\psc\space}
+
+\newcommand{\sag}{Sego-Aponte-Gianlupi}
+\newcommand{\sags}{\sag\space}
+
+\newcommand\footnoteref[1]{\protected@xdef\@thefnmark{\ref{#1}}\@footnotemark}
+
+
+% closed sqrt, tks https://tex.stackexchange.com/questions/29834/closed-square-root-symbol
+% \let\oldr@@t\r@@t
+% \def\r@@t#1#2{%
+% \setbox0=\hbox{$\oldr@@t#1{#2\,}$}\dimen0=\ht0
+% \advance\dimen0-0.2\ht0
+% \setbox2=\hbox{\vrule height\ht0 depth -\dimen0}%
+% {\box0\lower0.4pt\box2}}
+% \LetLtxMacro{\oldsqrt}{\sqrt}
+% \renewcommand*{\sqrt}[2][\ ]{\oldsqrt[#1]{#2}}
+
+
+\let\oldsqrt\sqrt
+% it defines the new \sqrt in terms of the old one
+\def\sqrt{\mathpalette\DHLhksqrt}
+\def\DHLhksqrt#1#2{%
+\setbox0=\hbox{$#1\oldsqrt{#2\,}$}\dimen0=\ht0
+\advance\dimen0-0.2\ht0
+\setbox2=\hbox{\vrule height\ht0 depth -\dimen0}%
+{\box0\lower0.4pt\box2}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 
 \clearpage
 
@@ -166,36 +296,58 @@
 
 % Adjust subsubsection title formatting
 \titleformat{\subsubsection}{\normalfont\itshape}{\thesubsubsection}{1em}{#1}
+% \renewcommand\thesubsubsection{\arabic{subsubsection}}
+
+% Set numbering of sections to go all the way to subsubsections
+\setcounter{secnumdepth}{3}
+
+%%%%%%%%%%%%%%%%
+% My commands
+%%%%%%%%%%%%%%%%
+\newcommand{\mH}{\mathcal{H}}
 
 %%%%%%%%%%%%%%%%
 % Chapter 1
 %%%%%%%%%%%%%%%%
 
-\input{chapter1.tex}
+\input{intro}
 
 %%%%%%%%%%%%%%%%
-% Chapter 2
+% Chapter agent based models
 %%%%%%%%%%%%%%%%
 
-\input{chapter2.tex}
+% \input{chapter-agent-base-models.tex}
 
 %%%%%%%%%%%%%%%%
-% Chapter 3
+% Chapter Sego-Aponte
 %%%%%%%%%%%%%%%%
 
-\input{chapter3.tex}
+\input{chapter-sego-aponte}
 
 %%%%%%%%%%%%%%%%
-% Chapter 4
+% Chapter Remdesivir
 %%%%%%%%%%%%%%%%
 
-\input{chapter4.tex}
+% \input{remdesivir}
+\input{chapter-remdesivir}
 
 %%%%%%%%%%%%%%%%
-% Chapter 5
+% Chapter Translator
 %%%%%%%%%%%%%%%%
+\input{chapter-translator}
+% \input{chapter3.tex}
 
-\input{chapter5.tex}
+%%%%%%%%%%%%%%%%
+% Chapter Phenocell
+%%%%%%%%%%%%%%%%
+\input{chapter-phenocell}
+% \input{chapter4.tex}
+
+%%%%%%%%%%%%%%%%
+% Chapter Discussion
+%%%%%%%%%%%%%%%%
+\input{chapter-discussion}
+% \input{chapter5.tex}
 
 %%%%%%%%%%%%%%%%
 % Appendices

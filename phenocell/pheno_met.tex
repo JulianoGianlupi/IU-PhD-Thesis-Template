@@ -1,0 +1,278 @@
+The Phenotype class has as attributes a descriptive name (\textit{e.g.}, Standard necrosis model, Flow Cytometry Basic), the time-step length ($dt$), the name of the time unit (\textit{e.g.,} second, minute), a list of Phases that make the Phenotype, the index of the Starting Phase, an optional "stand-alone" senescent Phase (i.e., a Phase that is outside the Phenotype cycle), the current Phase, and the amount of time spent in this Phenotype.
+Note that some of these attributes are shared with the Phase class, the Phenotype class should pass these shared attributes to its component Phases upon initialization. 
+
+This class has methods to time-step the phenotype model (Section~\ref{sec:meth:pheno:step}), to perform user-defined time-step tasks, to change the phenotype phase to an arbitrary phase of the phenotype cycle (Section~\ref{sec:meth:pheno:set-phase}), to go to the next phase in the cycle (Section~\ref{sec:meth:pheno:set-phase}), and to go to a non-changing senescent phase (Section~\ref{sec:meth:pheno:go-quies}).
+
+% \newpage
+\subsubsection{Phenotype class initialization}\label{sec:meth:pheno:init}
+
+\begin{listing}[!htb]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def __init__(self, name: str = "unnamed", dt: float = 1, 
+time_unit: str = "min", 
+    phases: list = None, senescent_phase: Phases.Phase or False = None, 
+    starting_phase_index: int = 0):
+    self.name = name
+    self.time_unit = time_unit
+    if dt <= 0 or dt is None:
+        raise ValueError(f"'dt' must be greater than 0. Got {dt}.")
+    self.dt = dt
+    if phases is None:
+        self.phases = [Phases.Phase(previous_phase_index=0,
+            next_phase_index=0, dt=self.dt, time_unit=time_unit)]
+    else:
+        self.phases = phases
+    if senescent_phase is None:
+        self.senescent_phase = Phases.SenescentPhase(dt=self.dt)
+    elif senescent_phase is not None and not senescent_phase:
+        self.senescent_phase = False
+    elif not isinstance(senescent_phase, Phases.Phase):
+        raise ValueError(
+            f"`senescent_phase` must Phases.Phase object, False, or"
+            f" None."
+            f" Got {senescent_phase}")
+    else:
+        self.senescent_phase = senescent_phase
+    if starting_phase_index is None:
+        starting_phase_index = 0
+    self.current_phase = self.phases[starting_phase_index]
+    self.time_in_phenotype = 0
+\end{minted}
+\caption{Phenotype class \code{\_\_init\_\_} function}\label{code:pheno:init}
+\end{listing}
+The Phenotype \code{\_\_init\_\_} function performs sanity checks and initializes attributes. Initialization of component Phases should be made in the Phenotype \code{\_\_init\_\_} function. The Phenotype class \code{\_\_init\_\_} function is shown in Listing~\ref{code:pheno:init}.
+
+\subsubsection{Phenotype time-step}\label{sec:meth:pheno:step}
+
+The first thing the Phenotype time-step function (Listing~\ref{code:pheno:step}) does is check if the Phenotype has just started (i.e., the time spent thus far in the Phenotype is 0), and if so it calls the initial Phase entry function. Then it increments the "amount of time spent in this Phenotype" attribute (\code{time\_in\_cycle} in the code) by $dt$, calls the current Phase's time-step function (Section~\ref{sec:meth:phase:step}, and checks if the Phenotype should move to the next Phase or go to quiescence (as determined by the Phase's time-step). 
+
+If the Phenotype should go to the next Phase it calls the \code{go\_to\_next\_phase} function (Section~\ref{sec:meth:pheno:set-phase}), if it should go to quiescence it calls the \code{go\_to\_quiescence} function (Section~\ref{sec:meth:pheno:go-quies}). The time-step function returns a tuple of three boolean flags, the values of which can be determined by the \code{go\_to\_next\_phase} function. The first flag of the tuple says if the Phenotype has changed Phases, the second if the simulated cell should be removed from the simulation, and the third if the simulated cell has undergone cell division.
+
+\begin{listing}[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def time_step_phenotype(self):
+            if not self.time_in_phenotype and \
+                self.current_phase.entry_function is not None:
+                    self.current_phase.entry_function(
+                        *self.current_phase.entry_function_args)
+        if self.user_phenotype_time_step is not None:
+            self.user_phenotype_time_step(
+                *self.user_pheno_time_step_args)
+        self.time_in_phenotype += self.dt
+        go_next_phase, exit_phenotype, transition_to_index = \
+            self.current_phase.time_step_phase()
+        if go_next_phase:
+            if transition_to_index is not None:
+                phase_idx = self.current_phase.index
+                old_next_phase_idx = \
+                    self.current_phase.next_phase_index
+                self.current_phase.next_phase_index = \
+                    transition_to_index
+            else:
+                phase_idx = None
+            changed_phases, cell_removed, cell_divides = \
+                self.go_to_next_phase()
+            if phase_idx is not None:
+                self.phases[phase_idx].next_phase_index  = \
+                    old_next_phase_idx
+            return changed_phases, cell_removed, cell_divides
+        elif exit_phenotype:
+            self.go_to_senescence()
+            changed_phases, cell_removed, cell_divides = (True, False, 
+                False)
+            return changed_phases, cell_removed, cell_divides
+        changed_phases, cell_removed, cell_divides = (False, False, 
+            False)
+        return changed_phases, cell_removed, cell_divides
+\end{minted}
+\caption{Phenotype time-step function}\label{code:pheno:step}
+\end{listing}
+
+
+% \begin{python}\label{code:pheno:step}
+%     def time_step_phenotype(self):
+%         if not self.time_in_phenotype and self.current_phase.entry_function is not None:
+%             self.current_phase.entry_function(*self.current_phase.entry_function_args)
+%         self.time_in_phenotype += self.dt
+%         go_next_phase, exit_phenotype = self.current_phase.time_step_phase()
+%         if go_next_phase:
+%             changed_phases, cell_dies, cell_divides = self.go_to_next_phase()
+%             return changed_phases, cell_dies, cell_divides
+%         elif exit_phenotype:
+%             self.go_to_quiescence()
+%             changed_phases, cell_dies, cell_divides = (True, False, False)
+%             return changed_phases, cell_dies, cell_divides
+%         changed_phases, cell_dies, cell_divides = (False, False, False)
+%         return changed_phases, cell_dies, cell_divides
+% \end{python}
+
+
+\subsubsection{Switching Phases}\label{sec:meth:pheno:set-phase}
+
+The \code{set\_phase} function (Listing~\ref{code:pheno:set-phase}) is responsible for switching the Phase of a Phenotype, it does so by setting the \code{current\_phase} to be the phase of index $i$. It also ensures that the Cell Volume sub-class attributes are correct in the case the cell has changed volume while in the current Phase and resets T (the time spent in the Phase) to zero. Finally, it calls the new Phase entry function if there is one.
+
+\begin{listing}[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def set_phase(self, idx):
+    # get the current cytoplasm, nuclear, calcified volumes
+    cyto_solid = self.current_phase.volume.cytoplasm_solid
+    cyto_fluid = self.current_phase.volume.cytoplasm_fluid
+    nucl_solid = self.current_phase.volume.nuclear_solid
+    nucl_fluid = self.current_phase.volume.nuclear_fluid
+    calc_frac = self.current_phase.volume.calcified_fraction
+    # get the target volumes
+    target_cytoplasm_solid = \
+        self.current_phase.volume.cytoplasm_solid_target
+    target_nuclear_solid = \
+        self.current_phase.volume.nuclear_solid_target
+    target_fluid_fraction = \
+        self.current_phase.volume.target_fluid_fraction
+    # set parameters of next phase
+    self.phases[idx].volume.cytoplasm_solid = cyto_solid
+    self.phases[idx].volume.cytoplasm_fluid = cyto_fluid
+    self.phases[idx].volume.nuclear_solid = nucl_solid
+    self.phases[idx].volume.nuclear_fluid = nucl_fluid
+    self.phases[idx].volume.calcified_fraction = calc_frac
+    self.phases[idx].volume.cytoplasm_solid_target = \
+        target_cytoplasm_solid
+    self.phases[idx].volume.nuclear_solid_target = \    
+        target_nuclear_solid
+    self.phases[idx].volume.target_fluid_fraction = \
+        target_fluid_fraction
+    # set phase
+    self.current_phase = self.phases[idx]
+    self.current_phase.time_in_phase = 0
+    if self.current_phase.entry_function is not None:
+        self.current_phase.entry_function(
+            *self.current_phase.entry_function_args)
+\end{minted}
+\caption{Phenotype Class \code{set\_phase} function.}\label{code:pheno:set-phase}
+\end{listing}
+
+
+% \begin{python}\label{code:pheno:set-phase}
+%     def set_phase(self, idx):
+%         # get the current cytoplasm, nuclear, calcified volumes
+%         cyto_solid = self.current_phase.volume.cytoplasm_solid
+%         cyto_fluid = self.current_phase.volume.cytoplasm_fluid
+%         nucl_solid = self.current_phase.volume.nuclear_solid
+%         nucl_fluid = self.current_phase.volume.nuclear_fluid
+%         calc_frac = self.current_phase.volume.calcified_fraction
+%         # get the target volumes
+%         target_cytoplasm_solid = self.current_phase.volume.cytoplasm_solid_target
+%         target_nuclear_solid = self.current_phase.volume.nuclear_solid_target
+%         target_fluid_fraction = self.current_phase.volume.target_fluid_fraction
+%         # set parameters of next phase
+%         self.phases[idx].volume.cytoplasm_solid = cyto_solid
+%         self.phases[idx].volume.cytoplasm_fluid = cyto_fluid
+%         self.phases[idx].volume.nuclear_solid = nucl_solid
+%         self.phases[idx].volume.nuclear_fluid = nucl_fluid
+%         self.phases[idx].volume.calcified_fraction = calc_frac
+%         self.phases[idx].volume.cytoplasm_solid_target = target_cytoplasm_solid
+%         self.phases[idx].volume.nuclear_solid_target = target_nuclear_solid
+%         self.phases[idx].volume.target_fluid_fraction = target_fluid_fraction
+%         # set phase
+%         self.current_phase = self.phases[idx]
+%         self.current_phase.time_in_phase = 0
+%         if self.current_phase.entry_function is not None:
+%             self.current_phase.entry_function(*self.current_phase.entry_function_args)
+% \end{python}
+
+The \code{go\_to\_next\_phase} (Listing~\ref{code:pheno:next-phase}) switches to the next Phase by calling \\*\code{set\_phase} with the current Phase's "next phase index" attribute. Before switching Phases, it fetches the boolean flags for division and removal (\textit{e.g.}, death, leaving the simulation domain) at Phase exit. It returns a tuple of three boolean flags: Phase change, cell removal from the simulation, and cell division.
+\begin{listing}[H]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def go_to_next_phase(self):
+    changed_phases = True
+    divides = self.current_phase.division_at_phase_exit
+    removal = self.current_phase.removal_at_phase_exit
+    self.set_phase(self.current_phase.next_phase_index)
+    return changed_phases, removal, divides
+\end{minted}
+\caption{Phenotype Class \code{go\_to\_next\_phase} function}\label{code:pheno:next-phase}
+\end{listing}
+
+% \begin{python}\label{code:pheno:next-phase}
+%     def go_to_next_phase(self):
+%         changed_phases = True
+%         divides = self.current_phase.division_at_phase_exit
+%         removal = self.current_phase.removal_at_phase_exit
+%         self.set_phase(self.current_phase.next_phase_index)
+%         return changed_phases, removal, divides
+% \end{python}
+
+\subsubsection{Leaving the Phenotype}\label{sec:meth:pheno:go-quies}
+
+To exit the Phenotype the modeler has to define the optional arrest function which is a member of the Phase class (Section~\ref{sec:meth:phase}). The arrest function is called by the Phase time-step function (Section~\ref{sec:meth:phase:step}) and its return value is used by the Phenotype time-step function to exit the Phenotype cycle.
+
+If the arrest function returns \code{True}, the Phenotype time-step calls \code{go\_to\_senescence}. \\*\code{go\_to\_senescence} checks that the Phenotype attribute \code{senescent\_phase} is a class of type Phase, if that's the case it sets the current phase to be the special senescent Phase. If that's not the case the function will simply return early.
+
+Before the Phase change, \code{go\_to\_quiescence} saves the volume parameters to temporary variables to keep them as they are after the change. As this is a change to a senescent Phase, all target volumes of the Cell Volume sub-class are set to be the current actual volumes (see Section~\ref{sec:meth:vol} for definition of target volume and actual volumes). It resets \code{time\_in\_phase} to be 0. The \code{go\_to\_quiescence} function is shown in Listing~\ref{code:pheno:quies}.
+
+\begin{listing}[H]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def go_to_senescence(self):
+    if not isinstance(self.senescent_phase, Phases.Phase):
+        return
+    # get the current cytoplasm, nuclear, calcified volumes
+    cyto_solid = self.current_phase.volume.cytoplasm_solid
+    cyto_fluid = self.current_phase.volume.cytoplasm_fluid
+    nucl_solid = self.current_phase.volume.nuclear_solid
+    nucl_fluid = self.current_phase.volume.nuclear_fluid
+    calc_frac = self.current_phase.volume.calcified_fraction
+    # setting the senescent phase volume parameters. 
+    # As the cell is now senescent it shouldn't want to change its
+    # volume, so we set the targets to be the current measurements
+    self.senescent_phase.volume.cytoplasm_solid = cyto_solid
+    self.senescent_phase.volume.cytoplasm_fluid = cyto_fluid
+    self.senescent_phase.volume.nuclear_solid = nucl_solid
+    self.senescent_phase.volume.nuclear_fluid = nucl_fluid
+    self.senescent_phase.volume.nuclear_solid_target = nucl_solid
+    self.senescent_phase.volume.cytoplasm_solid_target = cyto_solid
+    self.senescent_phase.volume.calcified_fraction = calc_frac
+    self.senescent_phase.volume.target_fluid_fraction = \
+        (cyto_fluid + nucl_fluid) / \ 
+            (nucl_solid + nucl_fluid + cyto_fluid + cyto_solid)
+    # set the phase to be senescent
+    self.current_phase = self.senescent_phase
+    self.current_phase.time_in_phase = 0
+\end{minted}
+\caption{Phenotype Class \code{go\_to\_quiescence} function.}\label{code:pheno:quies}
+\end{listing}
+
+
+

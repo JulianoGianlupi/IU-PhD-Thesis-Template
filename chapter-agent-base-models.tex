@@ -1,0 +1,152 @@
+\chapter{An overview of agent based models}\label{cha:abm}
+
+
+\textcolor{red}{In the usual cellular environment drag forces dominate and speed, not acceleration, is proportional to the force applied to the object [citations] (there is no inertia). \textit{I.e.,}}
+
+% \begin{equation}\label{eq:abm:cst-v}
+%     \dift{|\Vec{v}|} \approx 0
+% \end{equation}
+
+\begin{equation}\label{eq:abm:aristotle-said-nothing-wrong}
+    \Vec{v} \propto \Vec{F}
+\end{equation}
+
+
+\section{Cellular Potts Model}\label{sec:abm:cpm-history}
+
+The Cellular Potts Model (\textit{CPM})~\cite{graner1992simulation, savill_modelling_1997}, also known as Graner-Glazier–Hogeweg (\textit{GGH}) model, is an extension of the Potts model~\cite{potts1952some}. CPM was created to simulate multi-cellular biological systems~\cite{graner1992simulation}. The Potts model, in turn, is a generalization of the Ising model~\cite{ising1925beitrag}. In CPM energy minimization governs the dynamics of the system.
+In the following sections I will go over the historical evolution of \textit{CPM}.
+
+\subsection{The Ising Model}\label{sec:abm:cpm-history:ising}
+
+Ising was interested in modeling and explaining the phase transition of ferromagnetic materials losing their magnetic properties when heated~\cite{ising1925beitrag}. Magnetism arises from the alignment of atoms' spins. He developed a simple model that considers short-range interactions of the spins of atoms in a lattice (\textit{i.e.}, in a crystal structure). In his model each spin ($\sigma$) can be either up (denoted by a value of $+1$) or down (denoted by a value of $-1$). The spin configurations obey a Boltzmann probability (equation~\ref{eq:abm:boltzman-prob}), that means that for a high enough temperature any spin configuration is equally probable.
+
+\begin{equation}\label{eq:abm:boltzman-prob}
+P(\{\sigma\}) = \exp\left(-\frac{\mH(\{\sigma\})}{k_B T}\right)\,\,,
+\end{equation}
+\noindent where $\{\sigma\}$ is the spins configuration, and $\mH$ the Hamiltonian (\textit{i.e.}, the system's total energy).
+
+In the absence of an external magnetic field, the total energy of the spin configuration (the Hamiltonian) in Ising's model~\cite{ising1925beitrag} is
+
+\begin{equation}\label{eq:abm:ising-hamiltonian}
+\mH_I = -J\sum_{i=1}^{N}\sum_{j\in\mathcal{N}(i)} \sigma_i\sigma_j\,\,.
+\end{equation}
+
+\noindent The first sum of the double summation is done over the lattice sites (\textit{i}) and the second is over the first neighbors of \textit{i} ($j\in\mathcal{N}(i)$). The spin interaction energy is \textit{J}.
+
+Each neighboring opposed spins increases the system's energy by $2 \times J$, while neighboring aligned spins decrease the energy by $J$, therefore the spin-grid will rearrange itself to minimize opposing contacts, creating grains of aligned spins. The ferromagnetic transition happens at a critical temperature ($T_C$), for which all spin configurations are equally likely.
+
+\subsection{The Potts Model}\label{sec:abm:cpm-history:potts}
+
+Potts proposed a generalization of Ising's model~\cite{potts1952some}, instead of using only two values for spin he proposed using $q$ values for spin~\cite{potts1952some}. With Potts' model spin configurations that are not aligned to an arbitrary axis can be achieved. The Hamiltonian for Potts' model is
+
+\begin{equation}\label{eq:abm:potts-hamiltonian}
+    \mH_P = J \sum_{i=1}^{N}\sum_{j} ( 1 - \delta(\sigma_i,\sigma_j))\,\,.
+\end{equation}
+
+\noindent $\delta(a, b)$ is the Kronecker delta function~\cite{} \textcolor{red}{(do I need to cite the Kronecker delta??)}, if $a=b$ then $\delta(a, b)=1$ otherwise it is 0. The double summation is done in the same manner as before, $J$ still is the spin interaction energy. Having $q$ distinct spins is paramount for the development of the Cellular Potts Model (\textit{CPM}).
+
+The coaligned spin grains tend to be pinned to the grid (\textit{i.e.}, tend to be square) in the Potts model. This is a computational artifact, Holm \textit{et al.}~\cite{holm1991effects} showed that to minimize this pinning a greater neighborhood must be used in the second sum of Equation~\ref{eq:abm:potts-hamiltonian}, breaking with the short range assumption used by Potts and Ising.
+
+\subsection{The Cellular Potts Model}\label{sec:abm:apm-history:cpm}
+
+François Graner and James Glazier developed the first iteration of Cellular Potts to test the hypothesis of cell sorting by differential adhesion~\cite{graner1992simulation}. Hogeweg later expanded on CPM by adding a diffusion model to CPM~\cite{savill_modelling_1997}. Another name for CPM is Graner-Glazier-Hogeweg (GGH) model.
+
+Graner and Glazier defined regions of "aligned spin" as being a cell. This means that no two regions can have the same "spin" $q$, as mater of fact, what we called spin so far is from now on the cell-ID (still denoted by $\sigma$). In other words, before each point on the grid represented an atom with a spin value, now regions (comprised of several points on the grid) with the same cell-ID represent a cell.
+
+In CPM cells can be of different types, and the contact energy between cells will depend on both types. This allowed Graner and Glazier to probe the differential adhesion hypothesis~\cite{graner1992simulation}. More energy terms are needed to fully describe a cell, such as an energy related to the cell volume, chemotaxis, cell elongation, external field (\textit{i.e.} gravity), \textit{etc}. The simplest Hamiltonian for CPM is the one defined in~\cite{graner1992simulation}, it is
+
+\begin{equation}\label{eq:abm:cpm-hamiltonian}
+\mH_{CPM} = \sum_i \sum_{j_v} J(\tau(\sigma_i),\tau(\sigma_j))(1 - \delta(\sigma_i,\sigma_j)) + \sum_{\sigma}\lambda_V(\sigma)\left(V(\sigma) - V_{TG}(\sigma)\right)^2\,\,.
+\end{equation}
+
+\noindent The first term is the contact energy and the second the volume energy. $\sigma$ represent a cell (by referencing its ID), $\tau(\sigma)$ is the type of cell $\sigma$, $J(\tau(\sigma_i),\tau(\sigma_j))$ is the (type-pair dependent) contact energy between two cells, the contact energy is symmetric, \textit{i.e.}, $J(\tau,\tau') = J(\tau',\tau)$. $V(\sigma)$ is the current volume of cell $\sigma$, $V_{TG}(\sigma)$ is the target volume of cell $\sigma$, and $\lambda_V(\sigma)$ is the volume energy intensity for cell $\sigma$. 
+
+The double sum of the contact energy is made over a pixel $i$ and its neighbors $j_v$ (using a higher neighborhood order, as proposed by Holm \textit{et. al}~\cite{holm1991effects}). The Kronecker delta function here guaranties that a cell will not have (external) contact with itself. The volume energy is the harmonic potential, if a cell is above or below its target volume it will change its volume to be closer to the target. The sum for the target volume is made over all cells.
+
+\subsection{Temporal dynamics of Cellular Potts Model}\label{sec:abm:apm-history:cpm-dyn}
+
+Solving the equations for CPM analytically is impossible. Exploring all configurations numerically is also not doable before the heat death of the universe. The algorithm that evolves a CPM is
+
+\begin{enumerate}
+    \item Pick a random pixel from the grid ($i$)
+    \item Pick another random pixel ($j$) from $i$'s neighbors
+    \item If $i$ and $j$ don't belong to the same cell, propose \textcolor{red}{(propose is not the right word, I can only think of this phrase in portuguese...)} that the cell that occupies $i$ moves to occupy $j$ as well. Think as the cell that occupies $i$ is moving and pushing towards the cell that occupies $j$. 
+    \item Calculate the change of the system's energy due to the cell movement
+    
+    \begin{equation}\label{eq:abm:flip-attempt:delta}
+        \Delta \mH = \mH(\text{with movement}) - \mH(\text{without movement})
+    \end{equation}
+    
+    \item $\Delta \mH$ then defines a probability of accepting the move or not. It is
+    
+    \begin{equation}\label{eq:abm:flip-attempt:prob}
+        p(\text{accept move}) = \begin{cases}
+        1\text{, if } \Delta \mH \leq 0\\
+        \exp{\left(-\frac{\Delta \mH}{T}\right)}\text{, otherwise}
+        \end{cases}
+    \end{equation}
+\end{enumerate}
+
+This process is usually called a flip-copy attempt, I call it a move-attempt. In CPM, for a grid with \textit{N} pixels, one time-step is defined as \textit{N} move-attempts. The usual name, for historical reasons, for the time-step in CPM is "Monte Carlo Step" (MCS). $T$ in equation~\ref{eq:abm:flip-attempt:prob} is, also for historical reasons, called temperature. However, it has nothing to do with a temperature one would measure with a thermometer, it's better to think of it as the energy fluctuation amplitude of the cells' borders. \textcolor{red}{more on the temperature?}
+The CPM dynamics algorithm leads to a dampened movement in accordance with the equation of movement shown in Equation~\ref{eq:abm:aristotle-said-nothing-wrong}. 
+
+\section{Center Based Models}\label{sec:abm:center}
+
+% https://link.springer.com/article/10.1007/s40571-015-0082-3#Sec7
+
+\pscs is a center-based modelling (\textit{CBM}) framework. In CBMs cells are represented as a particle~\cite{van_liedekerke_simulating_2015} or a group of particles~\cite{teixeira_single_2021}, the particle is, usually, spherical. Unlike CPM, in center based models, forces are modeled explicitly, special consideration must be taken to respect the dominance of drag-forces. \pscs uses different time-steps for calculating the solution of diffusing elements in the simulation, for calculating the cell mechanics, and for performing cell behaviors, $\Delta t_{diff}$, $\Delta t_{mech}$, and $\Delta t_{cells}$ respectively. By default their values are $\Delta t_{diff} = 0.01 min$, $\Delta t_{mech} = 0.1 min$, and $\Delta t_{cells} = 6 min$.
+
+
+\subsection{Velocity in \psc}
+\psc updates each cell velocity ($v_i$) according to the force applied to the cell, obeying Equation~\ref{eq:abm:aristotle-said-nothing-wrong}. The velocity of a cell in \pscs is give by:
+
+\begin{subequations}\label{eq:abm:physi-vel}
+    \begin{equation}\label{eq:abm:physi-vel:vel}
+        \Vec{v_i} = \sum_{j\in\mathcal{N}(i)} \left[-\Vec{\mathcal{A}}(i, j) -\Vec{\mathcal{R}}(i, j)\right] - \Vec{\mathcal{A}}_B(i) - \Vec{\mathcal{R}}_B(i) + \Vec{v}^{\,\,i}_{mot}\,\,,
+    \end{equation}
+    \begin{equation}\label{eq:abm:physi-vel:cc-ad}
+        \Vec{\mathcal{A}}(i, j) = \sqrt{c_a^i c_a^j}\,\,\nabla\phi(\Delta\Vec{x}(i, j), R_A^i+R_A^j)\,\,,
+    \end{equation}
+    \begin{equation}\label{eq:abm:physi-vel:cc-rep}
+        \Vec{\mathcal{R}}(i, j) = \sqrt{c_r^i c_r^j}\,\, \nabla\psi(\Delta\Vec{x}(i, j), R_R^i+R_R^j)\,\,,
+    \end{equation}
+    \begin{equation}\label{eq:abm:physi-vel:cb-ad}
+        \Vec{\mathcal{A}}_B(i) = c_{a,b}^i \,\,\nabla\phi(-\Vec{d}(x_i), R_A^i)\,\,,
+    \end{equation}
+    \begin{equation}\label{eq:abm:physi-vel:cb-rep}
+        \Vec{\mathcal{R}}_B(i) = c_{r,b}^i \,\,\nabla\psi(-\Vec{d}(x_i), R_R^i)\,\,.
+    \end{equation}
+\end{subequations}
+
+\noindent Where $i$ is the $i$th cell, $j\in\mathcal{N}(i)$ the neighbors of $i$, $\Vec{\mathcal{A}}(i, j)$ is the adhesion force between cells $i$ and $j$, $\Vec{\mathcal{R}}(i, j)$ the repulsion between cells $i$ and $j$, $\Vec{\mathcal{A}}_B(i)$ the adhesion of cell $i$ to the basement membrane, and $\Vec{\mathcal{R}}_B(i)$ the repulsion of cell $i$ to the basement membrane~\cite{ghaffarizadeh_physicell_2018}. $c_a^i$ and $c_{a,b}^i$ are, respectively, the cell's cell-cell and cell-basement adhesion parameters,  $c_r^i$ and $c_{r,b}^i$ are, respectively, the cell's cell-cell and cell-basement repulsion parameters~\cite{ghaffarizadeh_physicell_2018}. $\Delta\Vec{x}(i, j)$ is the distance of cell $i$ to cell $j$ (\textit{i.e.}, $\Delta\Vec{x}(i, j) = \Vec{x}_i - \Vec{x}_j$), and $\Vec{d}(x_i)$ the distance from the closest point of the basement membrane to the cell~\cite{ghaffarizadeh_physicell_2018}. 
+
+$\phi(\Vec{x}, R)$ is the adhesion energy potential, and $\psi(\Vec{x}, R)$ the repulsion energy potential, they are  zero for $|\Vec{x}|>0$. The form of $\nabla\phi(\Vec{x}, R)$ and $\nabla\psi(\Vec{x}, R)$ are given in \psc's supplemental materials~\cite{ghaffarizadeh_physicell_2018}, they are, respectively:
+
+\begin{equation}\label{eq:abm:physi-ad-pot}
+    \nabla\phi(\Vec{x}, R) = \begin{cases}
+        \left(1 - \frac{|\Vec{x}|}{R} \right)\frac{\Vec{x}}{|\Vec{x}|}\,\,\,\text{    if }|\Vec{x}|\leq R\\
+        0\,\,\,\text{    otherwise}
+    \end{cases}\,\,,
+\end{equation}
+\noindent and,
+
+\begin{equation}\label{eq:abm:physi-rep-pot}
+    \nabla\psi(\Vec{x}, R) = \begin{cases}
+        -\left(1 - \frac{|\Vec{x}|}{R} \right)\frac{\Vec{x}}{|\Vec{x}|}\,\,\,\text{    if }|\Vec{x}|\leq R\\
+        0\,\,\,\text{    otherwise}
+    \end{cases}\,\,.
+\end{equation}
+
+Finally, $\Vec{v}^{\,\,i}_{mot}$ is cell $i$'s motility. Motility, in \psc, is the persistent motion of the cell~\cite{ghaffarizadeh_physicell_2018}. At each time-step a cell in \pscs has a probability of changing the motility direction given by
+
+\begin{equation}\label{eq:abm:physi:change-vmot}
+    Pr(\text{new}\,\,\,\Vec{v}^{\,\,i}_{mot}) = \Delta t_{mech} / \tau^i_{per}\,\,.
+\end{equation}
+\noindent Where $\tau_{per}$ is the persistence time~\cite{ghaffarizadeh_physicell_2018}. If a velocity update occurs, it will follow
+
+\begin{equation}
+    \Vec{v}^{\,\,i}_{mot} = s^i_{mot} \frac{\left(1 - b\right) \hat{\xi} + b \hat{d}^{\,\,i}_{bias}}{|\left(1 - b\right) \hat{\xi} + b \hat{d}^{\,\,i}_{bias}|}\,\,.
+\end{equation}
+\noindent With $s^i_{mot}$ the cell speed, $\hat{\xi}$ a random unit vector, $\hat{d}^{\,\,i}_{bias}$ the bias direction unit vector, and $b$ the motility randomness amount~\cite{ghaffarizadeh_physicell_2018}. $\hat{d}^{\,\,i}_{bias}$ is determined by the cell state, chemical field (chemotaxis in \pscs is represented as a component of $\hat{d}_{bias}$). The $b$ factor  is $\in[0, 1]$, $b=1$ represents a completely deterministic motility direction along $\hat{d}_{bias}$ and $b=0$ Brownian motion.
+
