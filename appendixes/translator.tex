@@ -1,0 +1,1085 @@
+
+
+\section{Converting Space Dimensions}\label{appendix:trans:dim-conv}
+
+
+\begin{python}
+def get_dims(pcdict, space_convs=_space_convs):
+    """
+    Parses PhysiCell data and generates CC3D space dimensions and unit conversions
+
+    This function looks for the value of the maximum and minimum of all coordinates in PhysiCell (
+    pcdict['domain']['x_min'], pcdict['domain']['x_max'], etc) and saves them to variables. It also looks for the
+    discretization variables from PhysiCell (pcdict['domain']['dx'], etc) and saves them to variables. Using the size of
+    the domain and the discretization it defines what will be the number of pixels in CompuCell3D's domain.
+    It also looks for the unit used in PhysiCell to determine what will be the pixel/unit factor in CC3D.
+
+    :param pcdict: Dictionary created from parsing PhysiCell XML
+    :param space_convs: Dictionary of predefined space units
+    :return pcdims, ccdims: Two tuples representing the dimension data from PhysiCell and in CC3D.
+          ((xmin, xmax), (ymin, ymax), (zmin, zmax), units), and
+          (cc3dx, cc3dy, cc3dz, cc3dspaceunitstr, cc3dds, autoconvert_space)
+    """
+    xmin = float(pcdict['domain']['x_min']) if "x_min" in pcdict['domain'].keys() else None
+    xmax = float(pcdict['domain']['x_max']) if "x_max" in pcdict['domain'].keys() else None
+
+    ymin = float(pcdict['domain']['y_min']) if "y_min" in pcdict['domain'].keys() else None
+    ymax = float(pcdict['domain']['y_max']) if "y_max" in pcdict['domain'].keys() else None
+
+    zmin = float(pcdict['domain']['z_min']) if "z_min" in pcdict['domain'].keys() else None
+    zmax = float(pcdict['domain']['z_max']) if "z_max" in pcdict['domain'].keys() else None
+
+    units = pcdict['overall']['space_units'] if 'overall' in pcdict.keys() and \
+                                                'space_units' in pcdict['overall'].keys() else 'micron'
+
+    autoconvert_space = True
+    if units not in space_convs.keys():
+        message = f"WARNING: {units} is not part of known space units. Automatic space-unit conversion disabled." \
+                  f"Available units for auto-conversion are:\n{space_convs.keys()}"
+        warnings.warn(message)
+        autoconvert_space = False
+
+    # the dx/dy/dz tags mean that for every voxel there are dx space-units.
+    # therefore [dx] = [space-unit/voxel]. Source: John Metzcar
+
+    dx = float(pcdict['domain']['dx']) if "dx" in pcdict['domain'].keys() else 1
+    dy = float(pcdict['domain']['dy']) if "dy" in pcdict['domain'].keys() else 1
+    dz = float(pcdict['domain']['dz']) if "dz" in pcdict['domain'].keys() else 1
+
+    # print(dx, dy, dz, type(dx), type(dy), type(dz), )
+    if not dx == dy == dz:
+        message = "WARNING! Physicell's dx/dy/dz are not all the same: " \
+                  f"dx={dx}, dy={dy}, dz={dz}\n" \
+                  f"Using {max(min(dx, dy, dz), 1)}"
+        warnings.warn(message)
+
+    ds = max(min(dx, dy, dz), 1)
+
+    diffx = 1 if xmin is None or xmax is None else round(xmax - xmin)
+    diffy = 1 if ymin is None or ymax is None else round(ymax - ymin)
+    diffz = 1 if zmin is None or zmax is None else round(ymax - zmin)
+
+    cc3dx = round(diffx / ds)
+    cc3dy = round(diffy / ds)
+    cc3dz = round(diffz / ds)
+
+    cc3dds = cc3dx / diffx  # pixel/unit
+
+    # [cc3dds] = pixel/unit
+    # [cc3dds] * unit = pixel
+
+    cc3dspaceunitstr = f"1 pixel = {cc3dds} {units}"
+
+    pcdims, ccdims = ((xmin, xmax), (ymin, ymax), (zmin, zmax), units), \
+                     (cc3dx, cc3dy, cc3dz, cc3dspaceunitstr, cc3dds, autoconvert_space)
+
+    return pcdims, ccdims
+\end{python}
+
+
+\section{Converting Time Dimensions}\label{appendix:trans:time-conv}
+
+\section{Converting Cell Types and Extracting Mechanics}\label{appendix:trans:cell-types-conv}
+
+\subsection{Cell Types Extraction}\label{appendix:trans:cell-types-conv:types}
+\begin{python}
+def make_cell_type_plugin(pcdict):
+    """
+    Makes the cell type plugin for CC3D
+
+    Passes pcdict to make_cell_type_tags to generate the cell types and returns the results
+
+    :param pcdict: Dictionary created from parsing PhysiCell XML
+    :return ct_str, wall, cell_types: string setting the cell type plugin for cc3d's XML, bool for the presence of a
+    wall cell type, list of cell types
+    """
+    ct_str = '\n<Plugin Name="CellType">\n\t' \
+             '<CellType TypeId="0" TypeName="Medium"/>\n'
+    typesstr, wall, cell_types = make_cell_type_tags(pcdict)
+    ct_str += typesstr
+    ct_str += '</Plugin>'
+    return ct_str, wall, cell_types
+\end{python}
+\begin{python}
+def make_cell_type_tags(pcdict):
+    """
+    Parses the PhysiCell dictionary to fetch the cell type names, generates the internal part of the cell type plugin
+    :param pcdict: Dictionary created from parsing PhysiCell XML
+    :return s, create_wall, cell_types: string for the cell type plugin, bool for the existance of a wall cell type,
+    list of cell type names
+    """
+    s = ''
+    cell_types = []
+    idx = 1
+    for child in pcdict['cell_definitions']['cell_definition']:
+        # print(child.tag, child.attrib, child.text)
+        name = child['@name'].replace(" ", "_")
+        cell_types.append(name)
+        ctt = f'\t<CellType TypeId="{idx}" TypeName="{name}"/>\n'
+        s += ctt
+        idx += 1
+    create_wall = get_boundary_wall(pcdict)
+    if create_wall:
+        s += f'\t<CellType Freeze="" TypeId="{idx}" TypeName="WALL"/>\n'
+        cell_types.append("WALL")
+    return s, create_wall, cell_types
+\end{python}
+
+\subsection{Mechanics Extraction}
+\begin{python}
+def get_cell_constraints(pcdict, space_unit, minimum_volume=8):
+    """
+    Extracts cell constraints from the given PhysiCell pcdict.
+
+    Parameters:
+    -----------
+    pcdict : dict
+        Dictionary created from parsing PhysiCell XML. Must contain a "cell_definitions" key that maps
+        to a dictionary with a "cell_definition" key. This key should contain a list of dictionaries, each of which
+        represents a Cell Type.
+    space_unit : float
+        A scaling factor for the simulation's spatial units. All volumes extracted from pcdict will be multiplied by
+        this factor raised to the power of the dimensionality of the simulation space.
+    minimum_volume : float, optional
+        The minimum volume allowed for any cell in pixels. If a cell's volume falls below this threshold after scaling,
+        the translator will reconvert space so that the minimum cell volume is  equal to this threshold. Defaults to 8.
+
+    Returns:
+    --------
+    constraints : dict
+        A dictionary containing the constraints for each Cell Type found in pcdict. Each key is a Cell Type name
+        (converted to an underscore-delimited string), and each value is a dictionary containing information about
+        that Cell Type's volume, mechanics, custom data, and phenotypes.
+    any_below : bool
+        A boolean indicating whether any cells had volumes that fell below minimum_volume after scaling.
+    volumes : list
+        A list containing the scaled volumes of each Cell Type found in pcdict.
+    minimum_volume : float
+        The minimum volume allowed for any cell, after scaling.
+
+    Raises:
+    -------
+    UserWarning
+        If a Cell Type's volume is missing a unit or value in pcdict, or if the scaled volume falls below
+        minimum_volume.
+    """
+    constraints = {}
+    any_below = False
+    volumes = []
+    for child in pcdict['cell_definitions']['cell_definition']:
+        ctype = child['@name'].replace(" ", "_")
+        constraints[ctype] = {}
+        volume, unit = get_cell_volume(child)
+        if volume is None or unit is None:
+            message = f"WARNING: cell volume for cell type {ctype} either doesn't have a unit \n(unit found: {unit}) " \
+                      f"or" \
+                      f" doesn't have a value (value found: {volume}). \nSetting the volume to be the minimum volume, " \
+                      f"{minimum_volume}"
+            warnings.warn(message)
+            volume = None
+            unit = "not specified"
+            dim = 3
+        else:
+            dim = int(unit.split("^")[-1])
+        if volume is None:
+            volumepx = None
+        else:
+            volumepx = volume * (space_unit ** dim)
+        below, minimum_volume = check_below_minimum_volume(volumepx, minimum=minimum_volume)
+        constraints[ctype]["volume"] = {f"volume ({unit})": volume,
+                                        "volume (pixels)": volumepx}
+        volumes.append(volumepx)
+        if below:
+            any_below = True
+            message = f"WARNING: converted cell volume for cell type {ctype} is below {minimum_volume}. Converted volume " \
+                      f"{volumepx}. \nIf cells are too small in CC3D they do not behave in a biological manner and may " \
+                      f"disapear. \nThis program will enforce that: 1) the volume proportions stay as before; 2) the " \
+                      f"lowest cell volume is {minimum_volume}"
+            warnings.warn(message)
+        constraints[ctype]["mechanics"] = get_cell_mechanics(child)
+        constraints[ctype]["custom_data"] = get_custom_data(child)
+        constraints[ctype]["phenotypes"], constraints[ctype]["phenotypes_names"] = get_cell_phenotypes(child)
+    return constraints, any_below, volumes, minimum_volume
+\end{python}
+
+\section{Converting Secretion and Uptake rates}\label{appendix:trans:sec-up}
+
+\begin{python}
+    def convert_secretion_uptake_data(sec_dict, time_conv, pctimeunit):
+    """
+    Convert secretion data from PhysiCell to CompuCell3D format.
+
+    This function converts the secretion data parsed from PhysiCell to CompuCell3D python commands to perform
+    secretion. It also adds comment to indicate any potential discrepancies between the two formats, such as
+    differences in the handling of target secretion or uptake bounds. The resulting dictionary is returned.
+
+    Parameters
+    ----------
+    sec_dict : dict
+        Dictionary containing parsed secretion data from PhysiCell.
+    time_conv : float
+        Conversion factor for time units.
+    pctimeunit : str
+        PhysiCell time unit.
+
+    Returns
+    -------
+    dict
+        Dictionary containing CompuCell3D secretion python commands.
+    """
+    if not sec_dict:
+        return {}
+    new_sec_dict = sec_dict
+    secretion_comment = '#WARNING: PhysiCell has a concept of "target secretion" that CompuCell3D does not. \n#The ' \
+                        'translating program attempts to implement it, but it may not be a 1 to 1 conversion.'
+    uptake_comment = '#WARNING: To avoid negative concentrations, in CompuCell3D uptake is "bounded." \n# If the amount' \
+                     ' that would be uptaken is larger than the value at that pixel,\n# the uptake will be a set ratio ' \
+                     'of the amount available.\n# The conversion program uses 1 as the ratio,\n# you may want to ' \
+                     'revisit this.'
+    for ctype in sec_dict.keys():
+        type_sec = sec_dict[ctype]
+        new_type_sec = type_sec
+        for field, data in type_sec.items():
+            unit = data['secretion_unit'] if 'secretion_unit' in data.keys() else None
+            mcs_secretion_rate, extra_sec_comment = convert_secretion_rate(data['secretion_rate'], unit, 
+                time_conv,pctimeunit)
+            data['secretion_rate_MCS'] = mcs_secretion_rate
+            data['secretion_comment'] = secretion_comment + extra_sec_comment
+            unit = data['net_export_unit'] if 'net_export_unit' in data.keys() else None
+            mcs_net_secretion_rate, extra_net_sec_comment = convert_net_secretion(data['net_export'], unit, 
+                time_conv, pctimeunit)
+            data['net_export_MCS'] = mcs_net_secretion_rate
+            data['net_secretion_comment'] = extra_net_sec_comment
+            mcs_uptake_rate, extra_up_comment = convert_uptake_rate(data['uptake_rate'], data['uptake_unit'], 
+                time_conv, pctimeunit)
+            data['uptake_rate_MCS'] = mcs_uptake_rate
+            data['uptake_comment'] = uptake_comment + extra_up_comment
+            if "secretion_target" not in data.keys():
+                data["secretion_target"] = 0
+            new_type_sec[field] = data
+        new_sec_dict[ctype] = new_type_sec
+    return new_sec_dict
+\end{python}
+
+
+
+
+\section{Re-scaling time}\label{code:trans:recon-time}
+
+\begin{python}
+def reconvert_time_parameter(d_elements, cctime, max_D=50):
+    """
+    Parameters:
+    -----------
+    d_elements : dict
+        a dictionary of diffusion elements.
+    cctime : tuple
+        The previously converted time unit parameters
+    max_D : float, optional
+        Maximum diffusion constant allowed. Default 50
+    Returns:
+    -------
+        d_elements : dict
+            the reconverted dictionary of diffusion elements.
+        new_cctime : tuple
+            the reconverted tuple of cc3d time parameters
+    """
+    # get_diffusion_constants returns a list of diffusion constants that do not use the steady-state solver
+    diffusion_constants = get_diffusion_constants(d_elements)
+    if len(diffusion_constants) == 0 or not max(diffusion_constants) > max_D:
+        return d_elements, cctime
+    message = "WARNING: the converted diffusion parameters were very high, using them as is would result in a very " \
+              "slow simulation. The translating software will reconvert the time unit in order to keep the diffusion" \
+              " parameters low."
+    warnings.warn(message)
+    max_old_D = max(diffusion_constants)
+    reduction_proportion = round(0.9 * max_D / max_old_D, 2)
+    new_gammas = []
+    for key in d_elements.keys():
+        d_elements[key]["D"] *= reduction_proportion
+        d_elements[key]["D_conv_factor"] *= reduction_proportion
+        d_elements[key]["D_conv_factor_text"] = \ 
+            d_elements[key]["D_conv_factor_text"].split("=")[0] + \ 
+            " = " + \
+            f'{d_elements[key]["D_conv_factor"]} ' + \
+            d_elements[key]["D_conv_factor_text"].split(" ")[-1]
+
+        d_elements[key]["gamma"] *= reduction_proportion
+        d_elements[key]["gamma_conv_factor"] *= reduction_proportion
+        d_elements[key]["gamma_conv_factor_text"] = \ 
+            d_elements[key]["gamma_conv_factor_text"].split("=")[0] + \ 
+            " = " + \
+            f'{d_elements[key]["gamma_conv_factor"]} ' + \
+            d_elements[key]["gamma_conv_factor_text"].split(" ")[-1]
+
+        new_gammas.append(d_elements[key]["gamma"])
+    new_cctime = [min(int(cctime[0] / reduction_proportion), 10 ** 9),
+                  f'1 MCS = {cctime[2] * reduction_proportion} {cctime[1].split(" ")[-1]}',
+                  cctime[2] * reduction_proportion,
+                  cctime[3]]
+    return d_elements, new_cctime
+\end{python}
+
+\section{Initial conditions}\label{code:trans:init-cond}
+
+\begin{python}
+def default_initial_cell_config(celltypes, xmax, ymax, zmax):
+    """
+    Returns the default UniformInitializer steppable.
+
+    The default_initial_cell_config function returns an XML string with a configuration for
+    the UniformInitializer steppable in CompuCell3D. The configuration is based on the input parameters of celltypes,
+    xmax, ymax, and zmax.
+
+    The UniformInitializer steppable is responsible for initializing the initial configuration of cells in the
+    simulation. This function sets up a rectangular slab of cells with a specified width and gap size, and restricts
+    the cell types to those specified in the celltypes list. The WALL cell type is excluded from the initialization
+    process.
+
+    Parameters
+    ----------
+    celltypes : list of str
+        List of cell types.
+    xmax : int
+        Maximum x dimension of the simulation.
+    ymax : int
+        Maximum y dimension of the simulation.
+    zmax : int
+        Maximum z dimension of the simulation.
+
+    Returns
+    -------
+    str
+        Configured XML string.
+    """
+    beg = '''<Steppable Type="UniformInitializer">
+\t<!-- Initial layout of cells in the form of rectangular slab -->
+\t<!-- PhysiCell has many complex ways of defining the initial arangement -->
+\t<!-- of cells. By default the translator uses a simple configuration, -->
+\t<!-- you are responsible for analysing the initialization of the original -->
+\t<!-- model and reimplement it accordingly -->
+\t<Region>\n'''
+    if (zmax != 1 and zmax != 0) and (xmax > 10 and ymax > 10 and zmax > 10):
+        box_min = f'\t\t<BoxMin x="{10}" y="{10}" z="{10}"/>\n'
+        box_max = f'\t\t<BoxMax x="{xmax - 10}" y="{ymax - 10}" z="{zmax - 10}"/>\n'
+    elif zmax != 1 and zmax != 0:
+        box_min = f'\t\t<BoxMin x="{1}" y="{1}" z="{1}"/>\n'
+        box_max = f'\t\t<BoxMax x="{xmax - 1}" y="{ymax - 1}" z="{zmax - 1}"/>\n'
+    else:
+        box_min = f'\t\t<BoxMin x="{10}" y="{10}" z="{0}"/>\n'
+        box_max = f'\t\t<BoxMax x="{xmax - 10}" y="{ymax - 10}" z="{1}"/>\n'
+
+    gap = "\t\t<Gap>0</Gap>\n\t\t<Width>7</Width>\n"
+
+    types = ''
+    for t in celltypes:
+        if t.upper() == "WALL":
+            continue
+        types += f"{t},"
+
+    types = types[:-1]
+
+    types = "\t\t<Types>" + types + "</Types>\n"
+
+    end = '''\t</Region>
+</Steppable>'''
+    steppable_string = beg + box_min + box_max + gap + types + end
+    return steppable_string
+
+\end{python}
+
+\section{Generating diffusion's XML}\label{code:trans:diff-xml-gen}
+
+\begin{python}
+def make_diffusion_plug(diffusing_elements, celltypes, flag_2d):
+    """
+    Generates the XML for the diffusion steppables in CC3D a diffusion plug, combining the finite element (FE) solver
+    and the steady-state solver.
+
+    Parameters
+    ----------
+    diffusing_elements : dict
+        Dictionary of diffusing elements and their parameters
+        Each key in the dictionary represents a diffusing element and its value is a dictionary with the following keys:
+        - use_steady_state : bool
+            Whether or not to use steady-state diffusion solver for this element.
+        - concentration_units : str
+            The concentration units of this element.
+        - D_w_units : float
+            The diffusion constant with units of concentration^2/time.
+        - D_og_unit : str
+            The original unit of the diffusion constant.
+        - D : float
+            The diffusion constant without units.
+        - gamma_w_units : float
+            The decay constant with units of 1/time.
+        - gamma_og_unit : str
+            The original unit of the decay constant.
+        - gamma : float
+            The decay constant without units.
+        - initial_condition : str
+            The initial concentration expression for this element.
+        - dirichlet : bool
+            Whether or not to use Dirichlet boundary conditions for this element.
+        - dirichlet_value : float
+            The value of Dirichlet boundary condition for this element.
+    celltypes : list
+        List of cell types
+    flag_2d : bool
+        Whether the simulation is in 2D
+
+    Returns
+    -------
+    str
+        The combined string of the FE and steady-state solvers
+    """
+
+    use_regular, use_steady = determine_diffusion_existence(diffusing_elements)
+
+    if use_regular:
+        FE_solver = make_diffusion_FE(diffusing_elements, celltypes, flag_2d)
+    else:
+        FE_solver = ""
+    if use_steady:
+        steady_state_solver = make_diffusion_steady(diffusing_elements, flag_2d)
+    else:
+        steady_state_solver = ""
+
+    return FE_solver + steady_state_solver
+\end{python}
+
+\begin{python}
+ def determine_diffusion_existence(diffusing_elements):
+    steadys = []
+    for _, item in diffusing_elements.items():
+        steadys.append(item["use_steady_state"])
+    if not bool(len(steadys)):
+        return False, False
+    steady = any(steadys)
+    regular = any([not el for el in steadys])
+    return regular, steady   
+\end{python}
+
+\begin{python}
+def make_diffusion_FE(diffusing_elements, celltypes, flag_2d):
+    """
+    Converts a dictionary of diffusion properties into a CC3D DiffusionSolverFE XML configuration string. T
+
+    This function generates an XML string that can be used to configure CC3D's DiffusionSolverFE. It takes three
+    arguments: diffusing_elements, celltypes, and flag_2d. diffusing_elements is a dictionary of the diffusing
+    elements, where each key is the name of the diffusing element and the corresponding value is another dictionary
+    containing the properties of that element, such as the diffusion constant and initial concentration. celltypes is a
+    list of the cell types, and flag_2d is a boolean indicating whether the simulation is in two dimensions or not.
+
+    The function loops through each diffusing element in the dictionary and generates a string with information about
+    the diffusion field, including its name, diffusion data (such as diffusion and decay constants), initial
+    concentration, and boundary conditions. It then concatenates these strings together to create the full XML string.
+
+    Parameters
+    ----------
+    diffusing_elements : dict
+        A dictionary of diffusion properties. Each key represents a diffusing element and contains a nested dictionary
+        with keys "D", "gamma", "concentration_units", "D_w_units", "D_og_unit", "gamma_w_units", "gamma_og_unit",
+        "use_steady_state", "initial_condition", "dirichlet", "dirichlet_value"
+    celltypes : list
+        A list of cell types.
+    flag_2d : bool
+        A boolean value indicating whether the simulation is in 2D or 3D.
+
+    Returns
+    -------
+    str
+        A string representation of the DiffusionSolverFE XML configuration file.
+
+    """
+    header = f'\n\n\t<Steppable Type="DiffusionSolverFE">\n\t\t<!-- The conversion uses DiffusionSolverFE and' \
+             f' SteadyStateDiffusionSolver ' \
+             f'by default. You may ' \
+             f'wish to use another diffusion solver-->\n'
+
+    full_str = header
+
+    for key, item in diffusing_elements.items():
+
+        if item["use_steady_state"]:
+            continue
+
+        name = key.replace(" ", "_")
+
+        # diffusion data
+        df_str = f'\t\t<DiffusionField Name="{name}">\n\t\t\t<DiffusionData>\n\t\t\t\t<FieldName>{name}</FieldName>\n'
+        conc_units = f'\t\t\t\t<Concentration_units>{item["concentration_units"]}</Concentration_units>\n'
+        og_D = f'\t\t\t\t<Original_diffusion_constant D="{item["D_w_units"]}" units= "{item["D_og_unit"]}"/>\n'
+        # conv = f'\t\t\t\t<CC3D_to_original units="(pixel^2/MCS)/(item["D_og_unit"])">{item["D_conv_factor"]}' \
+        #        '</CC3D_to_original>'
+        D_str = f'\t\t\t\t<GlobalDiffusionConstant>{item["D"]}</GlobalDiffusionConstant>\n'
+        og_g = f'\t\t\t\t<Original_decay_constant gamma="{item["gamma_w_units"]}" units= "{item["gamma_og_unit"]}"/>\n'
+        g_str = f'\t\t\t\t<GlobalDecayConstant>{item["gamma"]}</GlobalDecayConstant>\n'
+
+        init_cond_warn = '\t\t\t\t<!-- CC3D allows for diffusing fields initial conditions, if one was detected it ' \
+                         'will -->\n' \
+                         '\t\t\t\t<!-- be used here. For several reasons it may not work, if something looks wrong with' \
+                         ' -->\n' \
+                         '\t\t\t\t<!-- your diffusing field at the start of the simulation this may be the reason.' \
+                         ' -->\n' \
+                         '\t\t\t\t<!-- CC3D also allows the diffusing field initial condition to be set by a file. ' \
+                         'Conversion of a -->\n' \
+                         '\t\t\t\t<!-- PhysiCell diffusing field initial condition file into a CC3D compliant one is ' \
+                         'left as -->\n' \
+                         '\t\t\t\t<!-- an exercise to the reader. -->\n'
+
+        init_cond = f'\t\t\t\t <InitialConcentrationExpression>{item["initial_condition"]}<' \
+            f'/InitialConcentrationExpression>' \
+            '\n\t\t\t\t<!-- <ConcentrationFileName>INITIAL CONCENTRATION FIELD - typically a file with ' \
+            'path Simulation/NAME_OF_THE_FILE.txt</ConcentrationFileName> -->'
+
+        het_warning = "\n\t\t\t\t<!-- CC3D allows the definition of D and gamma on a cell type basis: -->\n"
+        cells_str = ""
+        for t in celltypes:
+            cells_str += f'\t\t\t\t<!--<DiffusionCoefficient CellType="{t}">{item["D"]}</DiffusionCoefficient>-->\n'
+            cells_str += f'\t\t\t\t<!--<DecayCoefficient CellType="{t}">{item["gamma"]}</DecayCoefficient>-->\n'
+        close_diff_data = "\t\t\t</DiffusionData>\n"
+
+        # boundary conditions
+
+        bc_head = '\t\t\t<BoundaryConditions>\n\t\t\t\t<!-- PhysiCell has either Dirichlet boundary conditions (i.e. ' \
+                  'constant ' \
+                  'value) -->\n\t\t\t\t<!-- or "free floating" boundary conditions (i.e., constant flux = 0). -->' \
+                  '\n\t\t\t\t<!-- CC3D ' \
+                  'allows ' \
+                  'for more control of boundary conditions, you may want to revisit the issue. -->\n'
+        if item['dirichlet']:
+            bc_body = f'\t\t\t\t<Plane Axis="X">\n\t\t\t\t\t<ConstantValue PlanePosition="Min" Value=' \
+                      f'"{item["dirichlet_value"]}"/>\n\t\t\t\t\t<ConstantValue PlanePosition="Max" Value=' \
+                      f'"{item["dirichlet_value"]}"/>\n\t\t\t\t\t<!-- Other options are (examples): -->\n\t\t\t\t\t' \
+                      f'<!--<ConstantDerivative PlanePosition="Min" Value="10.0"/> -->\n\t\t\t\t\t<!--' \
+                      f'<ConstantDerivative PlanePosition="Max" Value="10.0"/> -->\n\t\t\t\t\t<!--<Periodic/>-->' \
+                      '\t\t\t\t</Plane>\n' \
+                      f'\t\t\t\t<Plane Axis="Y">\n\t\t\t\t\t<ConstantValue PlanePosition="Min" Value=' \
+                      f'"{item["dirichlet_value"]}"/>\n\t\t\t\t\t<ConstantValue PlanePosition="Max" Value=' \
+                      f'"{item["dirichlet_value"]}"/>\n\t\t\t\t\t<!-- Other options are (examples): -->\n\t\t\t\t\t' \
+                      f'<!--<ConstantDerivative PlanePosition="Min" Value="10.0"/> -->\n\t\t\t\t\t<!--' \
+                      f'<ConstantDerivative PlanePosition="Max" Value="10.0"/> -->\n\t\t\t\t\t<!--<Periodic/>-->' \
+                      '\n\t\t\t\t</Plane>\n'
+            if not flag_2d:
+                bc_body += f'\t\t\t\t<Plane Axis="Z">\n\t\t\t\t\t<ConstantValue PlanePosition="Min" Value=' \
+                   f'"{item["dirichlet_value"]}"/>\n\t\t\t\t\t<ConstantValue PlanePosition="Max" Value=' \
+                   f'"{item["dirichlet_value"]}"/>\n\t\t\t\t\t<!-- Other options are (examples): -->\n\t\t\t\t\t' \
+                   f'<!--<ConstantDerivative PlanePosition="Min" Value="10.0"/> -->\n\t\t\t\t\t<!--' \
+                   f'<ConstantDerivative PlanePosition="Max" Value="10.0"/> -->\n\t\t\t\t\t<!--<Periodic/>-->' \
+                   '\n\t\t\t\t</Plane>\n'
+        else:
+            bc_body = f'\t\t\t\t<Plane Axis="X">\n\t\t\t\t\t<ConstantDerivative PlanePosition="Min" Value=' \
+              f'"0"/>\n\t\t\t\t\t<ConstantDerivative PlanePosition="Max" Value=' \
+              f'"0"/>\n\t\t\t\t\t<!-- Other options are (examples): -->\n\t\t\t\t\t' \
+              f'<!--<ConstantValue PlanePosition="Min" Value="10.0"/> -->\n\t\t\t\t\t<!--' \
+              f'<ConstantValue PlanePosition="Max" Value="10.0"/> -->\n\t\t\t\t\t<!--<Periodic/>-->' \
+              '\t\t\t\t</Plane>\n' \
+              f'\t\t\t\t<Plane Axis="Y">\n\t\t\t\t\t<ConstantDerivative PlanePosition="Min" Value=' \
+              f'"0"/>\n\t\t\t\t\t<ConstantDerivative PlanePosition="Max" Value=' \
+              f'"0"/>\n\t\t\t\t\t<!-- Other options are (examples): -->\n\t\t\t\t\t' \
+              f'<!--<ConstantValue PlanePosition="Min" Value="10.0"/> -->\n\t\t\t\t\t<!--' \
+              f'<ConstantValue PlanePosition="Max" Value="10.0"/> -->\n\t\t\t\t\t<!--<Periodic/>-->' \
+              '\t\t\t\t</Plane>\n'
+            if not flag_2d:
+                bc_body += f'\t\t\t\t<Plane Axis="Z">\n\t\t\t\t\t<ConstantDerivative PlanePosition="Min" Value=' \
+                   f'"0"/>\n\t\t\t\t\t<ConstantDerivative PlanePosition="Max" Value=' \
+                   f'"0"/>\n\t\t\t\t\t<!-- Other options are (examples): -->\n\t\t\t\t\t' \
+                   f'<!--<ConstantDerivative PlanePosition="Min" Value="10.0"/> -->\n\t\t\t\t\t<!--' \
+                   f'<ConstantDerivative PlanePosition="Max" Value="0.0"/> -->\n\t\t\t\t\t<!--<Periodic/>-->' \
+                   '\t\t\t\t</Plane>\n'
+        close_bc = "</BoundaryConditions>\n"
+        close_field = "</DiffusionField>\n"
+
+        full_field_def = df_str + conc_units + og_D + D_str + og_g + g_str + init_cond_warn + init_cond + het_warning + cells_str + \
+                         close_diff_data + bc_head + bc_body + close_bc + close_field
+        full_str += full_field_def
+    full_str += "</Steppable>\n"
+    return full_str
+\end{python}
+
+\begin{python}
+def make_diffusion_steady(diffusing_elements, flag_2d):
+    """
+    Creates a steady-state diffusion solver configuration for CC3D simulations based on the given diffusing elements.
+
+    This function generates an XML string that can be used to configure CC3D's steady state diffusion solver. It takes
+    two arguments: diffusing_elements and flag_2d. diffusing_elements is a dictionary of the diffusing
+    elements, where each key is the name of the diffusing element and the corresponding value is another dictionary
+    containing the properties of that element, such as the diffusion constant and initial concentration. flag_2d is a
+    boolean indicating whether the simulation is in two dimensions or not.
+
+    The function loops through each diffusing element in the dictionary and generates a string with information about
+    the diffusion field, including its name, diffusion data (such as diffusion and decay constants), initial
+    concentration, and boundary conditions. It then concatenates these strings together to create the full XML string.
+
+    Parameters
+    ----------
+    diffusing_elements : dict
+        diffusing_elements : dict
+        A dictionary of diffusion properties. Each key represents a diffusing element and contains a nested dictionary
+        with keys "D", "gamma", "concentration_units", "D_w_units", "D_og_unit", "gamma_w_units", "gamma_og_unit",
+        "use_steady_state", "initial_condition", "dirichlet", "dirichlet_value"
+
+    flag_2d : bool
+        A boolean indicating whether to use 2D or 3D solver.
+
+    Returns
+    -------
+    str
+        A string containing the configuration for the steady-state diffusion solver in CC3D simulations.
+    """
+    if flag_2d:
+        header = f'\n\n\t<Steppable Type="SteadyStateDiffusionSolver2D">\n\t\t<!-- The conversion uses ' \
+                 f'DiffusionSolverFE and' \
+                 f' SteadyStateDiffusionSolver ' \
+                 f'by default. You may ' \
+                 f'wish to use another diffusion solver-->\n'
+    else:
+        header = f'\n\n\t<Steppable Type="SteadyStateDiffusionSolver">\n\t\t<!-- The conversion uses ' \
+                 f'DiffusionSolverFE and' \
+                 f' SteadyStateDiffusionSolver ' \
+                 f'by default. You may ' \
+                 f'wish to use another diffusion solver-->\n'
+
+    full_str = header
+
+    for key, item in diffusing_elements.items():
+        if not item["use_steady_state"]:
+            continue
+
+        name = key.replace(" ", "_")
+
+        df_str = f'\t\t<DiffusionField Name="{name}">\n\t\t\t<DiffusionData>\n\t\t\t\t<FieldName>{name}</FieldName>\n'
+        conc_units = f'\t\t\t\t<Concentration_units>{item["concentration_units"]}</Concentration_units>\n'
+        og_D = f'\t\t\t\t<Original_diffusion_constant D="{item["D_w_units"]}" units= "{item["D_og_unit"]}"/>\n'
+
+        D_str = f'\t\t\t\t<DiffusionConstant>{item["D"]}</DiffusionConstant>\n'
+        og_g = f'\t\t\t\t<Original_decay_constant gamma="{item["gamma_w_units"]}" units= "{item["gamma_og_unit"]}"/>\n'
+        g_str = f'\t\t\t\t<DecayConstant>{item["gamma"]}</DecayConstant>\n'
+
+        init_cond_warn = '\t\t\t\t<!-- CC3D allows for diffusing fields initial conditions, if one was detected it ' \
+                         'will -->\n' \
+                         '\t\t\t\t<!-- be used here. For several reasons it may not work, if something looks wrong with' \
+                         ' -->\n' \
+                         '\t\t\t\t<!-- your diffusing field at the start of the simulation this may be the reason.' \
+                         ' -->\n' \
+                         '\t\t\t\t<!-- CC3D also allows the diffusing field initial condition to be set by a file. ' \
+                         'Conversion of a -->\n' \
+                         '\t\t\t\t<!-- PhysiCell diffusing field initial condition file into a CC3D compliant one is ' \
+                         'left as -->\n' \
+                         '\t\t\t\t<!-- an exercise to the reader. -->\n'
+
+        init_cond = f'\t\t\t\t <InitialConcentrationExpression>{item["initial_condition"]}<' \
+            f'/InitialConcentrationExpression>' \
+            '\n\t\t\t\t<!-- <ConcentrationFileName>INITIAL CONCENTRATION FIELD - typically a file with ' \
+            'path Simulation/NAME_OF_THE_FILE.txt</ConcentrationFileName> -->'
+
+        close_diff_data = "\t\t\t</DiffusionData>\n"
+
+        # boundary conditions
+
+        bc_head = '\t\t\t<BoundaryConditions>\n\t\t\t\t<!-- PhysiCell has either Dirichlet boundary conditions (i.e. ' \
+                  'constant ' \
+                  'value) -->\n\t\t\t\t<!-- or "free floating" boundary conditions (i.e., constant flux = 0). -->' \
+                  '\n\t\t\t\t<!-- CC3D ' \
+                  'allows ' \
+                  'for more control of boundary conditions, you may want to revisit the issue. -->\n'
+        if item['dirichlet']:
+            bc_body = f'\t\t\t\t<Plane Axis="X">\n\t\t\t\t\t<ConstantValue PlanePosition="Min" Value=' \
+                      f'"{item["dirichlet_value"]}"/>\n\t\t\t\t\t<ConstantValue PlanePosition="Max" Value=' \
+                      f'"{item["dirichlet_value"]}"/>\n\t\t\t\t\t<!-- Other options are (examples): -->\n\t\t\t\t\t' \
+                      f'<!--<ConstantDerivative PlanePosition="Min" Value="10.0"/> -->\n\t\t\t\t\t<!--' \
+                      f'<ConstantDerivative PlanePosition="Max" Value="10.0"/> -->\n\t\t\t\t\t<!--<Periodic/>-->' \
+                      '\t\t\t\t</Plane>\n' \
+                      f'\t\t\t\t<Plane Axis="Y">\n\t\t\t\t\t<ConstantValue PlanePosition="Min" Value=' \
+                      f'"{item["dirichlet_value"]}"/>\n\t\t\t\t\t<ConstantValue PlanePosition="Max" Value=' \
+                      f'"{item["dirichlet_value"]}"/>\n\t\t\t\t\t<!-- Other options are (examples): -->\n\t\t\t\t\t' \
+                      f'<!--<ConstantDerivative PlanePosition="Min" Value="10.0"/> -->\n\t\t\t\t\t<!--' \
+                      f'<ConstantDerivative PlanePosition="Max" Value="10.0"/> -->\n\t\t\t\t\t<!--<Periodic/>-->' \
+                      '\n\t\t\t\t</Plane>\n'
+            if not flag_2d:
+                bc_body += f'\t\t\t\t<Plane Axis="Z">\n\t\t\t\t\t<ConstantValue PlanePosition="Min" Value=' \
+                   f'"{item["dirichlet_value"]}"/>\n\t\t\t\t\t<ConstantValue PlanePosition="Max" Value=' \
+                   f'"{item["dirichlet_value"]}"/>\n\t\t\t\t\t<!-- Other options are (examples): -->\n\t\t\t\t\t' \
+                   f'<!--<ConstantDerivative PlanePosition="Min" Value="10.0"/> -->\n\t\t\t\t\t<!--' \
+                   f'<ConstantDerivative PlanePosition="Max" Value="10.0"/> -->\n\t\t\t\t\t<!--<Periodic/>-->' \
+                           '\n\t\t\t\t</Plane>\n'
+        else:
+            bc_body = f'\t\t\t\t<Plane Axis="X">\n\t\t\t\t\t<ConstantDerivative PlanePosition="Min" Value=' \
+              f'"0"/>\n\t\t\t\t\t<ConstantDerivative PlanePosition="Max" Value=' \
+              f'"0"/>\n\t\t\t\t\t<!-- Other options are (examples): -->\n\t\t\t\t\t' \
+              f'<!--<ConstantValue PlanePosition="Min" Value="10.0"/> -->\n\t\t\t\t\t<!--' \
+              f'<ConstantValue PlanePosition="Max" Value="10.0"/> -->\n\t\t\t\t\t<!--<Periodic/>-->' \
+              '\t\t\t\t</Plane>\n' \
+              f'\t\t\t\t<Plane Axis="Y">\n\t\t\t\t\t<ConstantDerivative PlanePosition="Min" Value=' \
+              f'"0"/>\n\t\t\t\t\t<ConstantDerivative PlanePosition="Max" Value=' \
+              f'"0"/>\n\t\t\t\t\t<!-- Other options are (examples): -->\n\t\t\t\t\t' \
+              f'<!--<ConstantValue PlanePosition="Min" Value="10.0"/> -->\n\t\t\t\t\t<!--' \
+              f'<ConstantValue PlanePosition="Max" Value="10.0"/> -->\n\t\t\t\t\t<!--<Periodic/>-->' \
+              '\t\t\t\t</Plane>\n'
+            if not flag_2d:
+                bc_body += f'\t\t\t\t<Plane Axis="Z">\n\t\t\t\t\t<ConstantDerivative PlanePosition="Min" Value=' \
+                   f'"0"/>\n\t\t\t\t\t<ConstantDerivative PlanePosition="Max" Value=' \
+                   f'"0"/>\n\t\t\t\t\t<!-- Other options are (examples): -->\n\t\t\t\t\t' \
+                   f'<!--<ConstantDerivative PlanePosition="Min" Value="10.0"/> -->\n\t\t\t\t\t<!--' \
+                   f'<ConstantDerivative PlanePosition="Max" Value="10.0"/> -->\n\t\t\t\t\t<!--<Periodic/>-->' \
+                           '\t\t\t\t</Plane>\n'
+        close_bc = "</BoundaryConditions>\n"
+        close_field = "</DiffusionField>\n"
+
+        full_field_def = df_str + conc_units + og_D + D_str + og_g + g_str + init_cond_warn + init_cond + \
+                         close_diff_data + bc_head + bc_body + close_bc + close_field
+        full_str += full_field_def
+
+    full_str += "</Steppable>\n"
+    return full_str
+\end{python}
+
+
+\section{Stepabble generation helper functions}\label{code:trans:cc3d:step-gen-general}
+
+\begin{python}
+def steppable_declaration(step_name, mitosis=False):
+    if not mitosis:
+        stype = "SteppableBasePy"
+    else:
+        stype = "MitosisSteppableBase"
+    return f"class {step_name}Steppable({stype}):\n"    
+\end{python}
+
+\begin{python}
+def steppable_imports(user_data="", phenocell_dir=False):
+    if not phenocell_dir:
+        phenocell_dir = "C:\\PhenoCellPy"
+    imports = '''from cc3d.cpp.PlayerPython import *\nfrom cc3d import CompuCellSetup
+from cc3d.core.PySteppables import *\nimport numpy as np\n
+'''
+    phenocell = f'''import sys\n
+# IMPORTANT: PhysiCell has a concept of cell phenotype, PhenoCellPy (https://github.com/JulianoGianlupi/PhenoCellPy) 
+# has a similar implementation of phenotypes. You should install PhenoCellPy to translate the Phenotypes from PhysiCell.
+# Then change the default path used below with your PhenoCellPy's installation directory
+sys.path.extend(['{phenocell_dir}'])
+global pcp_imp
+pcp_imp = False
+try:
+\timport PhenoCellPy as pcp
+\tpcp_imp = True
+except:
+\tpass\n\n
+user_data={user_data}\n\n
+'''
+    return imports+phenocell
+\end{python}
+
+\begin{python}
+def steppable_init(frequency, mitosis=False):
+    if mitosis:
+        return mitosis_init(frequency)
+    return f'''\n\tdef __init__(self, frequency={frequency}):
+\t\tSteppableBasePy.__init__(self,frequency)\n'''
+\end{python}
+
+\begin{python}
+def mitosis_init(frequency):
+    return f'''\n\tdef __init__(self,frequency={frequency}):
+\t\tMitosisSteppableBase.__init__(self,frequency)\n'''
+\end{python}
+
+\begin{python}
+def steppable_start():
+    return '''
+\tdef start(self):
+\t\t"""
+\t\tCalled before MCS=0 while building the initial simulation
+\t\t"""
+\t\tself.pixel_to_space = float(self.get_xml_element('pixel_to_space').cdata)  # pixel/[unit], see xml for units
+\t\tself.mcs_to_time = float(self.get_xml_element('mcs_to_time').cdata)  # MCS/[unit], see xml for units'''
+\end{python}
+\begin{python}
+def steppable_step():
+    step = '''
+\tdef step(self, mcs):
+\t\t"""
+\t\tCalled every frequency MCS while executing the simulation
+
+\t\t:param mcs: current Monte Carlo step
+\t\t"""\n
+'''
+    return step
+
+
+def steppable_finish():
+    finish = '''
+\tdef finish(self):
+\t\t"""
+\t\tCalled after the last MCS to wrap up the simulation. Good place to close files and do post-processing
+\t\t"""\n
+'''
+    return finish
+\end{python}
+\begin{python}
+def steppable_on_stop():
+    stop = '''
+\tdef on_stop(self):
+\t\t"""
+\t\tCalled if the simulation is stopped before the last MCS
+\t\t"""
+\t\tself.finish()\n
+'''
+    return stop
+\end{python}
+
+\begin{python}
+def _add_to_function(function, extra):
+    return function+'\n'+extra+'\n'
+\end{python}
+\begin{python}
+def add_to_init(init, additional_init):
+    return _add_to_function(init, additional_init)
+\end{python}
+\begin{python}
+def add_to_start(start, additional_start):
+    return _add_to_function(start, additional_start)
+\end{python}
+\begin{python}
+def add_to_step(step, additional_step):
+    return _add_to_function(step, additional_step)
+\end{python}
+\begin{python}
+def add_to_finish(finish, additional_finish):
+    return _add_to_function(finish, additional_finish)
+\end{python}
+\begin{python}
+def add_to_on_stop(on_stop, additional_on_stop):
+    return _add_to_function(on_stop, additional_on_stop)
+\end{python}
+
+\begin{python}
+def mitosis_update_attribute():
+    update = '''
+\tdef update_attributes(self):
+\t\tself.parent_cell.targetVolume /= 2.0
+\t\tself.clone_parent_2_child()
+'''
+    return update
+\end{python}
+
+\section{Generate constraint loops helper function}\label{code:trans:cc3d:constraint-loops-helper-function}
+
+\begin{python}
+def get_dicts_for_type(ctype, cell_dicts):
+    ds = []
+    for d in cell_dicts:
+        if ctype in d.keys():
+            ds.append(d[ctype])
+    return ds
+\end{python}
+
+\begin{python}
+def cell_type_constraint(ctype, this_type_dicts):
+    if not this_type_dicts:
+        return ''
+    loop = f"\t\tfor cell in self.cell_list_by_type(self.{ctype.upper()}):\n"
+    full = loop
+    for cell_dict in this_type_dicts:
+        for key, value in cell_dict.items():
+            if key == "phenotypes" and bool(cell_dict["phenotypes"]):
+                line = "\t\t\tif pcp_imp:\n"
+                line += f"\t\t\t\tcell.dict['{key}']=self.phenotypes['{ctype}']\n"
+                line += f"\t\t\t\tcell.dict['current_phenotype'] = cell.dict['{key}']" \
+                        f"['{cell_dict['phenotypes_names'][0]}'].copy()\n"
+                line += f"\t\t\t\tcell.dict['volume_conversion'] = cell.targetVolume / \\\n" \
+                    f"\t\t\t\t\tcell.dict['current_phenotype'].current_phase.volume.total\n"
+            elif key == "custom_data":
+                line = f"\t\t\t# NOTE: you are responsible for finding how this data" \
+                       f"is used in the original model\n\t\t\t# and re-implementing in CC3D" \
+                       f"\n\t\t\tcell.dict['{key}']={value}\n"
+            elif type(value) == str:
+                line = f"\t\t\tcell.dict['{key}']='{value}'\n"
+            elif type(value) == dict:
+                clean_value = value.copy()
+                to_pop = []
+                for subkey in value.keys():
+
+                    if "comment" in subkey:
+                        to_pop.append(subkey)
+                [clean_value.pop(p) for p in to_pop]
+                line = f"\t\t\tcell.dict['{key}']={clean_value}\n"
+            else:
+                line = f"\t\t\tcell.dict['{key}']={value}\n"
+            if key in ["volume", "surface"]:
+                line += apply_CC3D_constraint(key, value)
+            full += line
+    return full + '\n\n'
+\end{python}
+
+
+\section{Generating phenotype models initialization}\label{code:trans:cc3d:constr-step:pheno}
+
+
+\begin{python}
+def initialize_phenotypes(constraint_dict):
+    pheno_str = "\n\t\tif pcp_imp:\n"
+    pheno_str += "\t\t\tself.phenotypes = {}\n"
+    for ctype, cdict in constraint_dict.items():
+        if "phenotypes" in cdict.keys():
+            pheno_str += f"\t\t\tdt = 1/self.mcs_to_time\n"
+            pheno_str += f"\t\t\tself.phenotypes['{ctype}']" + "= {}\n"
+            for phenotype, data in cdict["phenotypes"].items():
+                time_unit = "None"
+                if "rate units" in data.keys():
+                    time_unit = data["rate units"].split("/")[-1]
+                fixed = []
+                duration = []
+                for fix, dur in data["phase durations"]:
+                    duration.append(dur)
+                    if fix == "TRUE":
+                        ff = True
+                    else:
+                        ff = False
+                    fixed.append(ff)
+                nuclear_fluid = []
+                nuclear_solid = []
+                cyto_fluid = []
+                cyto_solid = []
+                cyto_to_nucl = []
+                if 'fluid fraction' not in data.keys():
+                    data['fluid fraction'] = [.75] * len(data["phase durations"])
+                # if 'fluid fraction' not in data.keys():
+                #     data['fluid fraction'] = [.75]*len(data["phase durations"])
+                if 'fluid fraction' in data.keys() and 'nuclear volume' in data.keys() and 'total' in data.keys():
+                    for fluid, nucl, total in zip(data['fluid fraction'], data['nuclear volume'], data['total']):
+                        nfl = fluid * nucl
+                        nuclear_fluid.append(nfl)
+                        nuclear_solid.append(nucl - nfl)
+                        cytt = total - nucl
+                        cytf = fluid * cytt
+                        cyts = cytt - cytf
+                        cyto_fluid.append(cytf)
+                        cyto_solid.append(cyts)
+                        cyto_to_nucl.append(cytt / (1e-16 + nucl))
+                else:
+                    nuclear_fluid = [None] * len(data["phase durations"])
+                    nuclear_solid = [None] * len(data["phase durations"])
+                    cyto_fluid = [None] * len(data["phase durations"])
+                    cyto_solid = [None] * len(data["phase durations"])
+                    cyto_to_nucl = [None] * len(data["phase durations"])
+                if 'calcified fraction' not in data.keys():
+                    data['calcified fraction'] = [0] * len(data["phase durations"])
+
+                if 'cytoplasm biomass change rate' not in data.keys():
+                    data['cytoplasm biomass change rate'] = [None] * len(data["phase durations"])
+                if 'nuclear biomass change rate' not in data.keys():
+                    data['nuclear biomass change rate'] = [None] * len(data["phase durations"])
+                if 'calcification rate' not in data.keys():
+                    data['calcification rate'] = [None] * len(data["phase durations"])
+                if 'fluid change rate' not in data.keys():
+                    data['fluid change rate'] = [None] * len(data["phase durations"])
+                pheno_str += \
+                    f"\t\t\tphenotype = pcp.get_phenotype_by_name('{phenotype}')\n"
+                pheno_str += f"\t\t\tself.phenotypes['{ctype}']['{phenotype}'] = phenotype(dt=dt, \n\t\t\t\t" \
+                 f"time_unit='{time_unit}', \n\t\t\t\tfixed_durations={fixed},  " \
+                 f"\n\t\t\t\tphase_durations={duration}, \n\t\t\t\t" \
+                 f"cytoplasm_volume_change_rate={data['cytoplasm biomass change rate']}, \n\t\t\t\t" \
+                 f"nuclear_volume_change_rate={data['nuclear biomass change rate']}, \n\t\t\t\t" \
+                 f"calcification_rate={data['calcification rate']}, \n\t\t\t\t" \
+                 f"calcified_fraction={data['calcified fraction']}, \n\t\t\t\t" \
+                 f"target_fluid_fraction={data['fluid fraction']}, \n\t\t\t\t" \
+                 f"nuclear_fluid={nuclear_fluid}, \n\t\t\t\t" \
+                 f"nuclear_solid={nuclear_solid}, \n\t\t\t\t" \
+                 f"nuclear_solid_target={nuclear_solid}, \n\t\t\t\t" \
+                 f"cytoplasm_fluid={cyto_fluid}, \n\t\t\t\t" \
+                 f"cytoplasm_solid={cyto_solid}, \n\t\t\t\t" \
+                 f"cytoplasm_solid_target={cyto_solid}, \n\t\t\t\t" \
+                 f"target_cytoplasm_to_nuclear_ratio={cyto_to_nucl}, \n\t\t\t\t" \
+                 f"fluid_change_rate={data['fluid change rate']})\n"
+    return pheno_str
+\end{python}
+% \begin{listing}[!htbp]
+% \begin{minted}[
+% frame=lines,
+% framesep=2mm,
+% baselinestretch=1.1,
+% %bgcolor=light-gray,
+% fontsize=\footnotesize,
+% linenos
+% ]{python}
+% def initialize_phenotypes(constraint_dict):
+%     pheno_str = "\n\t\tif pcp_imp:\n"
+%     pheno_str += "\t\t\tself.phenotypes = {}\n"
+%     for ctype, cdict in constraint_dict.items():
+%         if "phenotypes" in cdict.keys():
+%             pheno_str += f"\t\t\tdt = 1/self.mcs_to_time\n"
+%             pheno_str += f"\t\t\tself.phenotypes['{ctype}']" + "= {}\n"
+%             for phenotype, data in cdict["phenotypes"].items():
+%                 time_unit = "None"
+%                 if "rate units" in data.keys():
+%                     time_unit = data["rate units"].split("/")[-1]
+%                 fixed = []
+%                 duration = []
+%                 for fix, dur in data["phase durations"]:
+%                     duration.append(dur)
+%                     if fix == "TRUE":
+%                         ff = True
+%                     else:
+%                         ff = False
+%                     fixed.append(ff)
+%                 nuclear_fluid = []
+%                 nuclear_solid = []
+%                 cyto_fluid = []
+%                 cyto_solid = []
+%                 cyto_to_nucl = []
+%                 if 'fluid fraction' not in data.keys():
+%                     data['fluid fraction'] = [.75] * len(data["phase durations"])
+%                 # if 'fluid fraction' not in data.keys():
+%                 #     data['fluid fraction'] = [.75]*len(data["phase durations"])
+%                 if 'fluid fraction' in data.keys() and 'nuclear volume' in data.keys() and 'total' in data.keys():
+%                     for fluid, nucl, total in zip(data['fluid fraction'], data['nuclear volume'], data['total']):
+%                         nfl = fluid * nucl
+%                         nuclear_fluid.append(nfl)
+%                         nuclear_solid.append(nucl - nfl)
+%                         cytt = total - nucl
+%                         cytf = fluid * cytt
+%                         cyts = cytt - cytf
+%                         cyto_fluid.append(cytf)
+%                         cyto_solid.append(cyts)
+%                         cyto_to_nucl.append(cytt / (1e-16 + nucl))
+%                 else:
+%                     nuclear_fluid = [None] * len(data["phase durations"])
+%                     nuclear_solid = [None] * len(data["phase durations"])
+%                     cyto_fluid = [None] * len(data["phase durations"])
+%                     cyto_solid = [None] * len(data["phase durations"])
+%                     cyto_to_nucl = [None] * len(data["phase durations"])
+%                 if 'calcified fraction' not in data.keys():
+%                     data['calcified fraction'] = [0] * len(data["phase durations"])
+
+%                 if 'cytoplasm biomass change rate' not in data.keys():
+%                     data['cytoplasm biomass change rate'] = [None] * len(data["phase durations"])
+%                 if 'nuclear biomass change rate' not in data.keys():
+%                     data['nuclear biomass change rate'] = [None] * len(data["phase durations"])
+%                 if 'calcification rate' not in data.keys():
+%                     data['calcification rate'] = [None] * len(data["phase durations"])
+%                 if 'fluid change rate' not in data.keys():
+%                     data['fluid change rate'] = [None] * len(data["phase durations"])
+%                 pheno_str += f"\t\t\tphenotype = pcp.get_phenotype_by_name('{phenotype}')\n"
+%                 pheno_str += f"\t\t\tself.phenotypes['{ctype}']['{phenotype}'] = phenotype(dt=dt, \n\t\t\t\t" \
+%                              f"time_unit='{time_unit}', \n\t\t\t\tfixed_durations={fixed},  " \
+%                              f"\n\t\t\t\tphase_durations={duration}, \n\t\t\t\t" \
+%                              f"cytoplasm_volume_change_rate={data['cytoplasm biomass change rate']}, \n\t\t\t\t" \
+%                              f"nuclear_volume_change_rate={data['nuclear biomass change rate']}, \n\t\t\t\t" \
+%                              f"calcification_rate={data['calcification rate']}, \n\t\t\t\t" \
+%                              f"calcified_fraction={data['calcified fraction']}, \n\t\t\t\t" \
+%                              f"target_fluid_fraction={data['fluid fraction']}, \n\t\t\t\t" \
+%                              f"nuclear_fluid={nuclear_fluid}, \n\t\t\t\t" \
+%                              f"nuclear_solid={nuclear_solid}, \n\t\t\t\t" \
+%                              f"nuclear_solid_target={nuclear_solid}, \n\t\t\t\t" \
+%                              f"cytoplasm_fluid={cyto_fluid}, \n\t\t\t\t" \
+%                              f"cytoplasm_solid={cyto_solid}, \n\t\t\t\t" \
+%                              f"cytoplasm_solid_target={cyto_solid}, \n\t\t\t\t" \
+%                              f"target_cytoplasm_to_nuclear_ratio={cyto_to_nucl}, \n\t\t\t\t" \
+%                              f"fluid_change_rate={data['fluid change rate']})\n"
+%     return pheno_str
+% \end{minted}
+% \caption{}\label{code:trans:cc3d:constr-step:pheno}
+% \end{listing}

@@ -1,0 +1,96 @@
+Here we present all the parameters from Sego \textit{et al.}~\cite{sego_modular_2020}. In this work, we only changed the simulation step time-length, going from 1200s to 300s. We have marked it with an asterix and included our value in parenthesis. The reasoning for the choice of each of the parameters can be found in their original paper in Table 1.
+
+\begin{table}[H] 
+%\tablesize{\scriptsize}
+\caption{Sego et al.'s conversion factors\label{sup:table:sego_params:1}}
+%\tablesize{} % You can specify the fontsize here, e.g., \tablesize{\footnotesize}. If commented out \small will be used.
+\centering
+\begin{tabular}{cc}
+% \toprule
+\textbf{Conversion Factors}    & \textbf{Value}           \\
+% \midrule
+Simulation step $\Delta t$     & $1200.0 s$ *  ($300.0s$) \\
+Lattice width                  & $4.0 \mu m$              \\
+Scale factor for concentration & $10^{-14} mol$          \\
+
+% \bottomrule
+\end{tabular}
+\end{table}
+
+\pagebreak
+% \end{paracol}
+\renewcommand\arraystretch{0.6}
+\begin{table}[H] 
+\centering
+% \widetable
+%\tablesize{\scriptsize}
+\caption{Sego et al.'s parameters part 1\label{sup:table:sego_params:2}}
+%\tablesize{} % You can specify the fontsize here, e.g., \tablesize{\footnotesize}. If commented out \small will be used.
+
+\resizebox{\columnwidth}{!}{\begin{tabular}{cc|cc}
+% \toprule
+\textbf{Simulation parameter name}                                                                          & \textbf{Value}        & \textbf{Simulation parameter name}                                                                                                          & \textbf{Value}               \\
+% \midrule
+Cell diameter                                                                                               & $12.0 \mu m$          & \begin{tabular}[c]{@{}c@{}}Viral decay \\ rate $\gamma_{vir}$\end{tabular}                                                                  & $7.71\times10^{-6} s^{-1}$   \\
+Replication rate $r_{max}$                                                                                  & $(1/12)10^{-3}s^{-1}$ & \begin{tabular}[c]{@{}c@{}}Cytokine diffusion \\ coefficient $D_{cyt}$\end{tabular}                                                         & $0.16 \mu m^2 s^{-1}$        \\
+Translating rate $r_t$                                                                                      & $(1/18)10^{-3}s^{-1}$ & \begin{tabular}[c]{@{}c@{}}Cytokine diffusion \\ length $\lambda_{cyt}$\end{tabular}                                                        & $100 \mu m$                  \\
+Unpacking rate $r_u$                                                                                        & $(1/6)10^{-3}s^{-1}$  & \begin{tabular}[c]{@{}c@{}}Cytokine decay \\ rate $\gamma_{cyt}$\end{tabular}                                                               & $1.32\times10^{-5} s^{-1}$   \\
+Packaging rate $r_p$                                                                                        & $(1/6)10^{-3}s^{-1}$  & \begin{tabular}[c]{@{}c@{}}Maximum cytokine \\ immune secretion rate \\ $\sigma_{cyt}(immune activated)$\end{tabular}                       & $3.5\times10^{-4} pM s^{-1}$ \\
+Release rate $r_s$                                                                                          & $(1/6)10^{-3}s^{-1}$  & \begin{tabular}[c]{@{}c@{}}Immune secretion \\ midpoint\\ $V_{cyt}(immune activated)$\end{tabular}                                          & $1 pM$                       \\
+\begin{tabular}[c]{@{}c@{}}Scale factor for number \\ of mRNA per\\ infected cell $mRNA_{avg}$\end{tabular} & $1000 cell^{-1}$      & \begin{tabular}[c]{@{}c@{}}Cytokine immune \\ uptake rate\\ $\omega_{cyt}(immune activated)$\end{tabular}                                   & $3.5\times10^{-4} pM s^{-1}$ \\
+\begin{tabular}[c]{@{}c@{}}Viral dissociation \\ coefficient $r_{half}$\end{tabular}                        & $2000$                & \begin{tabular}[c]{@{}c@{}}Maximum cytokine \\ infected cell\\ secretion rate \\ $\sigma_{cyt}(infected)$\end{tabular}                           & $3.5\times10^{-3} pM s^{-1}$ \\
+\begin{tabular}[c]{@{}c@{}}Viral diffusion \\ coefficient $D_{vir}$\end{tabular}                            & $0.01 \mu m^2 s^{-1}$ & \begin{tabular}[c]{@{}c@{}}Infected cell cytokine \\ secretion mid-point \\ $V_{cyt}(infected)$, \\ $V_{cyt}(virus-releasing)$\end{tabular} & $0.1$                        \\
+\begin{tabular}[c]{@{}c@{}}Viral diffusion \\ length $\lambda_{vir}$\end{tabular}                           & $36 \mu m$            & \begin{tabular}[c]{@{}c@{}}Cytokine secretion \\ Hill coefficient \\ $h_{cyt}$\end{tabular}                                                 & $2$  \\
+
+% \bottomrule
+\end{tabular}
+}
+\end{table}
+% \begin{paracol}{2}
+% \linenumbers
+% \switchcolumn
+
+% \pagebreak
+% \end{paracol}
+\begin{table}[H] 
+% \widetable
+%\tablesize{\scriptsize}
+\caption{Sego et al.'s parameters part 2\label{sup:table:sego_params:3}}
+\resizebox{\columnwidth}{!}{\begin{tabular}{cc|cc}
+% \toprule
+\centering
+\textbf{Simulation parameter name}                                                                          & \textbf{Value}        & \textbf{Simulation parameter name}                                                                                                          & \textbf{Value}               \\
+% \midrule
+\begin{tabular}[c]{@{}l@{}}Immune cell cytokine \\ activation $EC_{50,cyt,ac}$\end{tabular} & $10 pM$ & \begin{tabular}[c]{@{}l@{}}Virally-induced apoptosis \\ dissociation coefficient $V_{apo}$\end{tabular} & $100$ \\
+\begin{tabular}[c]{@{}l@{}}Immune cell equilibrium \\ bound cytokine $EQ_{ck}$\end{tabular} & $210 pM$ & \begin{tabular}[c]{@{}l@{}}Virally-induced apoptosis\\ characteristic time constant $\alpha_{apo}$\end{tabular} & $20 min$ \\
+\begin{tabular}[c]{@{}l@{}}Immune cell bound \\ cytokine memory $\rho_{cyt}$\end{tabular} & $0.99998 s^{-1}$ & \begin{tabular}[c]{@{}l@{}}Immune cell activation \\ Hill coefficient $h_{act}$\end{tabular} & $2$ \\
+\begin{tabular}[c]{@{}l@{}}Immune cell activated \\ time\end{tabular} & $10 h$ & \begin{tabular}[c]{@{}l@{}}Immune response \\ add immune cell\\ coefficient $\beta_{add}$\end{tabular} & $1/1200 s^{-1}$ \\
+\begin{tabular}[c]{@{}l@{}}Oxidation Agent \\ diffusion coefficient $D_{oxi}$\end{tabular} & $0.64 \mu m^2 s^{-1}$ & \begin{tabular}[c]{@{}l@{}}Immune response \\ subtract immune\\ cell coefficient $\beta_{sub}$\end{tabular} & $1/6000 cell^{-1} s^{-1}$ \\
+\begin{tabular}[c]{@{}l@{}}Oxidation Agent \\ diffusion length $\lambda_{oxi}$\end{tabular} & $36 \mu m$ & \begin{tabular}[c]{@{}l@{}}Immune response \\ delay coefficient $\beta_{delay}$\end{tabular} & $1.2\times10^6 s$ \\
+\begin{tabular}[c]{@{}l@{}}Oxidation Agent \\ decay rate $\gamma_{oxi }$\end{tabular} & $1.32\times10^{-5}s^{-1}$ & \begin{tabular}[c]{@{}l@{}}Immune response \\ decay coefficient $\beta_{decay}$\end{tabular} & $1/12000 s^{-1}$ \\
+\begin{tabular}[c]{@{}l@{}}Immune cell oxidation\\ agent secretion rate $\sigma_{oxi}$\end{tabular} & $3.5\times10^{-3} pM\,\,s^{-1}$ & \begin{tabular}[c]{@{}l@{}}Immune response\\ cytokine transmission\\ coefficient $\alpha_{sig}$\end{tabular} & $0.5$ \\
+\begin{tabular}[c]{@{}l@{}}Immune cell \\ $C_{cyt}$ threshold for \\ Oxidation Agent release $t_{sec}$\end{tabular} & \begin{tabular}[c]{@{}l@{}}$10 A.U. =$\\ $1.5625 pM$\end{tabular} & \begin{tabular}[c]{@{}l@{}}Immune response \\ probability scaling\\ coefficient $\alpha_{immune}$\end{tabular} & $0.01$ \\
+\begin{tabular}[c]{@{}l@{}}Tissue cell $C_{oxi}$\\ threshold for death $t_{death-oxi}$\end{tabular} & \begin{tabular}[c]{@{}l@{}}$1.5 A.U. =$\\ $0.234375 pM$\end{tabular} & \begin{tabular}[c]{@{}l@{}}Number of immune cell\\ seeding samples $n_{seeding}$\end{tabular} & $10$ \\
+\begin{tabular}[c]{@{}l@{}}Initial density of \\ unbound cell surface \\ receptors $R_o$\end{tabular} & $200 cell^{-1}$ & \begin{tabular}[c]{@{}l@{}}Initial immune cell \\ target volume\end{tabular} & $64 \mu m^3$ \\
+
+% \bottomrule
+\end{tabular}
+}
+\end{table}
+% \begin{paracol}{2}
+% \linenumbers
+% \switchcolumn
+
+\begin{table}[H]
+\caption{Sego et al.'s parameters part 3\label{sup:table:sego_params:4}}
+    \centering
+    \resizebox{\columnwidth}{!}{\begin{tabular}{cc|cc}
+         \begin{tabular}[c]{@{}l@{}}Virus-receptor \\ association affinity $k_{on}$\end{tabular} & $1.4\times10^4 M^{-1}\,s^{-1}$ & \begin{tabular}[c]{@{}l@{}}Immune cell lambda \\ volume $\lambda_{volume}$\end{tabular} & $9$ \\
+\begin{tabular}[c]{@{}l@{}}Virus-receptor\\ dissociation affinity $k_{off}$\end{tabular} & $1.4\times10^{-4} s$ & \begin{tabular}[c]{@{}l@{}}Initial number of \\ immune cells\end{tabular} & $0$ \\
+Infection threshold & $1$ & \begin{tabular}[c]{@{}l@{}}Immune cells lambda \\ chemotaxis $\lambda_{chemotaxis}$\end{tabular} & $1$ \\
+\begin{tabular}[c]{@{}l@{}}Uptake Hill \\ coefficient $k_{upt}$\end{tabular} & $2$ & \begin{tabular}[c]{@{}l@{}}Intrinsic Random \\ Motility $H^*$\end{tabular} & $10$ \\
+\begin{tabular}[c]{@{}l@{}}Uptake characteristic\\ time constant $\alpha_{upt}$\end{tabular} & $20 min$ & \begin{tabular}[c]{@{}l@{}}Contact coefficients \\ J (all interfaces)\end{tabular} & $10$ \\
+\begin{tabular}[c]{@{}l@{}}Virally-induced \\ apoptosis Hill\\ coefficient $h_{apo}$\end{tabular} & $2$ &  & \\
+    \end{tabular}
+    }
+\end{table}

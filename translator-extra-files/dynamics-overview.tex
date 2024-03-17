@@ -1,0 +1,196 @@
+
+% \textcolor{red}{TODO: explain that the energy is actually a force, have a figure}
+
+Both platforms are physics simulators that aim to reproduce multicellular dynamics,
+in particular cell movement and rearrangement.
+In this section I'll give an overview of the strategies they employ to achieve this. In particular, it is important to note that drag forces are dominant in the cellular environment~\cite{ghaffarizadeh_physicell_2018}, this results in inertialess movement~\cite{ghaffarizadeh_physicell_2018}, \textit{i.e.,}  
+
+% \begin{equation}\label{eq:abm:cst-v}
+%     \dift{|\Vec{v}|} \approx 0
+% \end{equation}
+
+\begin{equation}\label{eq:abm:aristotle-said-nothing-wrong}
+    \Vec{v} \propto \Vec{F}\,\,.
+\end{equation}
+
+% \textcolor{red}{TODO: "IN both models there's drag against a fixed inertial frame, instead of against a moving fluid.. this makes rigid body movement hard in both. On the other hand, the translation process is easier, as both models don't differ here."}
+
+It is important to note that the drag in \ccds is relative to the lattice itself, and that in \pscs the forces act on the velocity of the cell. Therefore, both platforms have drag against a fixed, universal, inertial frame (instead of, \textit{e.g.}, against a moving fluid). This makes rigid body movement hard in both. Both platforms having a common assumption about drag, on the other hand, make the translation process of this aspect straightforward.
+
+
+\subsection{Dynamics in \ccd}\label{sec:abm:cpm-history}
+
+\ccds is an implementation of the the Cellular Potts Model (\textit{CPM})~\cite{graner1992simulation, savill_modelling_1997}, also known as Graner-Glazier–Hogeweg (\textit{GGH}) model. CPM is an modification of the Potts model~\cite{potts1952some,graner1992simulation}. CPM was created to simulate multi-cellular biological systems~\cite{graner1992simulation}. In CPM energy minimization governs the dynamics of the system. François Graner and James Glazier developed the first iteration of Cellular Potts to test the hypothesis of cell sorting by differential adhesion~\cite{graner1992simulation}. Hogeweg later expanded on CPM by adding a diffusion model to CPM~\cite{savill_modelling_1997}.
+
+Graner and Glazier defined that cells are made of pixels with the same "cell-ID," not unlike cell in a microscopy picture are made of pixels.
+% regions of "aligned spin" as being a cell. 
+This means that no two cells
+% regions 
+can have the same ID,
+% "spin" $q$, as mater of fact, what we called spin so far is from now on the cell-ID (still 
+denoted by $\sigma$. In other words, 
+% before each point on the grid represented an atom with a spin value, now 
+regions 
+% (comprised of several points on the grid) 
+with the same cell-ID represent a cell. In CPM cells can be of different types, and the contact energy between cells will depend on both types. This allowed Graner and Glazier to probe the differential adhesion hypothesis~\cite{graner1992simulation}. More energy terms are needed to fully describe cell behavior and morphology,
+% a cell, 
+such as an energy related to the cell volume, to chemotaxis, to cellular elongation (cells in CPM tend to be round due to surface energy minimization), directed movement, \textit{etc}. The simplest Hamiltonian for CPM is the one defined in~\cite{graner1992simulation}, it is
+
+\begin{equation}\label{eq:abm:cpm-hamiltonian}
+\mH_{CPM} = \sum_i \sum_{\{j\}_i} J(\tau(\sigma_i),\tau(\sigma_j))(1 - \delta(\sigma_i,\sigma_j)) + \sum_{\sigma}\lambda_V(\sigma)\left(V(\sigma) - V_{TG}(\sigma)\right)^2\,\,.
+\end{equation}
+
+\noindent The first term is the contact energy and the second the volume energy. $\sigma$ represent a cell (by referencing its ID), $\tau(\sigma)$ is the type of cell $\sigma$, $J(\tau(\sigma_i),\tau(\sigma_j))$ is the (type-pair dependent) contact energy between two cells, the contact energy is symmetric, \textit{i.e.}, $J(\tau,\tau') = J(\tau',\tau)$. $V(\sigma)$ is the current volume of cell $\sigma$ (in pixels), $V_{TG}(\sigma)$ is the target volume of cell $\sigma$, and $\lambda_V(\sigma)$ is the volume energy intensity for cell $\sigma$. 
+
+The double sum of the contact energy is made over a pixel $i$ and the set of pixels inside a range, $\{j\}_i$. $\{j\}_i$ are the pixel-neighbors of $i$. This neighborhood is a Von Neumann neighborhood with a set order defined by the user~\cite{swat_multi-scale_2012}. Figure~\ref{fig:trans:neigh} shows how this neighborhood changes based on the range. It should be noted that using a low order neighborhood causes cells to pin to the lattice, \textit{i.e.}, they become square and their borders are paralel to the cardinal directions of the lattice~\cite{holm1991effects}. 
+% its neighbors $\{j\}_i$ (using a higher neighborhood order, as proposed by Holm \textit{et. al}~\cite{holm1991effects}). 
+$\delta(a, b)$ is the Kronecker delta function, if $a=b$ then $\delta(a, b)=1$ otherwise it is 0.
+The Kronecker delta function here guaranties that a cell will not have a contact energy with itself. The volume energy is the harmonic potential, if a cell is above or below its target volume there will be an energy penalty to the system and the cell will tent to
+change its volume to be closer to the target. The sum for the target volume is made over all cells. 
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{.45\textwidth}
+        \includegraphics[width=\textwidth]{figures/translator/neigh/Picture1.png}
+        \caption{}\label{fig:trans:neigh:1}
+    \end{subfigure}
+    % \label{fig:my_label}
+    \begin{subfigure}{.45\textwidth}
+        \includegraphics[width=\textwidth]{figures/translator/neigh/Picture2.png}
+        \caption{}\label{fig:trans:neigh:2}
+    \end{subfigure}
+
+    \begin{subfigure}{.45\textwidth}
+        \includegraphics[width=\textwidth]{figures/translator/neigh/Picture3.png}
+        \caption{}\label{fig:trans:neigh:3}
+    \end{subfigure}
+    % \label{fig:my_label}
+    \begin{subfigure}{.45\textwidth}
+        \includegraphics[width=\textwidth]{figures/translator/neigh/Picture4.png}
+        \caption{}\label{fig:trans:neigh:4}
+    \end{subfigure}
+    \caption{Pixel neighborhoods for each order, main pixel in red, neighborhood in blue. \ref{fig:trans:neigh:1}) 1st order, \ref{fig:trans:neigh:2}) 2nd order, \ref{fig:trans:neigh:3}) 3rd order, \ref{fig:trans:neigh:4}) 4th order.}
+    \label{fig:trans:neigh}
+\end{figure}
+
+
+
+\subsubsection{Chemotaxis in CPM}\label{sec:abm:apm-history:chemotaxis-cpm}
+
+% Chemotaxis is the movement of a living entity due to a chemical stimulus. Cells chemotax for a myriad of reasons, from immune cells seeking sources of infection~\cite{sego_modular_2020}, to bacteria searching for food~\cite{}
+
+Chemotaxis is a fundamental cell behavior that both \ccds and \pscs represent and have available. Chemotaxis in \ccds is implemented through an energy term in the Hamiltonian. In its most common form, this term is:
+\begin{equation}
+    \mH_{chemotaxis} = - \sum_k \lambda^c_k(\sigma) \left( c_k(j) - c_(i)\right)\,\,.
+\end{equation}
+\noindent Where $k$ is the index of the field the cell is chemotaxing on, $j$ is the pixel the cell ($\sigma$) is moving towards and $i$ the pixel it is moving from, $c_k$ field $k$'s value,  $\lambda^c_k$ the chemotaxing strength to that field. With a positive $\lambda^c_k$ cell $\sigma$ will chemotax to higher values of $c_k$ and with a negative $\lambda^c_k$ towards lower levels of $c_k$. If the cell doesn't chemotax then all $\lambda^c_k$ are 0.
+See Section~\ref{sec:abm:center:vel} for an explanation of how \pscs implements chemotaxis.
+
+
+% an ubiquitous cell behavior, 
+
+\subsubsection{Temporal dynamics of Cellular Potts Model}\label{sec:abm:apm-history:cpm-dyn}
+
+Solving the equations for CPM analytically is impossible. Exploring all energy (\textit{i.e.}, pixel) configurations numerically is also not doable before the heat death of the universe. 
+% The algorithm that evolves a CPM is not the same as the algorithm that evolves the Ising or the Potts model. In Ising or Potts, the algorith picks a lattice site and proposes to change it to any allowed value. That means there's no concept of directions, it also means that there's detailed balance (any update done can be undone in the next step). 
+The CPM algorithm chooses one pixel at random ($i$), then it chooses a second pixel ($j$) from the Von Neumann neighbors of $i$,  it proposes that the cell that occupies $i$ also occupies $j$ (it proposes a pixel-ownership change), it checks what is the system's energy change due to this pixel-ownership change, and accepts or rejects the change.
+% In CPM, the algorithm picks a pixel and evaluates it only against that pixel's neighbors, now there's a movement direction, and (potentially) a movement length. 
+This has three important consequences: one as the change in energy has a direction, the model is changed from an energy formalism to a force formalism; two, updates only happen at cell borders; three, there's no detailed balance, the dynamics are not reversible (\textit{e.g.}, if a cell disappears it can't re-appear). These dynamics correspond to biological reality, but they mean that this algorithm (a modified Metropolis algorithm~\cite{glazier2007magnetization, graner1992simulation}) can't solve the equilibrium statistical mechanics that the original Metropolis algorithm was designed to solve~\cite{metropolis1953equation, hastings1970monte}.
+% you do not get the equilibrium statistical mechanics that the metropolis algorithm was designed to solve. 
+It should be noted that the background (\textit{i.e.}, medium) cannot appear in between cells, and that the Von Neuman neighborhood order of the algorithm doesn't have to be the same as the one used by the contact energy.
+
+The steps of the modified Metropolis algorithm used in CPM are~\cite{swat_multi-scale_2012}:
+
+
+
+\begin{enumerate}
+    \item Pick a random pixel from the grid ($i$)
+    \item Pick another random pixel ($j$) from $i$'s neighbors
+    \item If $i$ and $j$ don't belong to the same cell, attempt a pixel ownership change (\textit{i.e.}, that the cell that occupies $i$ moves to occupy $j$). Think as the cell that occupies $i$ is moving and pushing towards the cell that occupies $j$. 
+    \item Calculate the change of the system's energy due to the cell movement
+    
+    \begin{equation}\label{eq:abm:flip-attempt:delta}
+        \Delta \mH = \mH(\text{with movement}) - \mH(\text{without movement})
+    \end{equation}
+    
+    \item $\Delta \mH$ then defines a probability of accepting the move or not. It is
+    
+    \begin{equation}\label{eq:abm:flip-attempt:prob}
+        Pr(\text{accept move}) = \begin{cases}
+        1\text{, if } \Delta \mH \leq 0\\
+        \exp{\left(-\frac{\Delta \mH}{T}\right)}\text{, otherwise}
+        \end{cases}
+    \end{equation}
+\end{enumerate}
+
+This process is usually called a flip-copy attempt, I call it a move-attempt. In CPM, for a grid with \textit{N} pixels, one time-step is defined as \textit{N} move-attempts. The usual name, for historical reasons, for the time-step in CPM is "Monte Carlo Step" (MCS). $T$ in equation~\ref{eq:abm:flip-attempt:prob} is, also for historical reasons, called temperature. However, it has nothing to do with a temperature one would measure with a thermometer, it sets fluctuation amplitude of the cells' borders. $T$ scales all the energies of the system, and can be set by the user.
+The CPM dynamics algorithm leads to a dampened movement in accordance with the equation of movement shown in Equation~\ref{eq:abm:aristotle-said-nothing-wrong}. 
+
+\subsection{Dynamics in \psc}\label{sec:abm:center}
+
+% https://link.springer.com/article/10.1007/s40571-015-0082-3#Sec7
+
+\pscs is a center-based modelling (\textit{CBM}) framework. In CBMs cells are represented as a particle~\cite{van_liedekerke_simulating_2015} or a group of particles~\cite{teixeira_single_2021}, the particle is, usually, spherical. \pscs uses different time-steps for calculating the solution of diffusing elements in the simulation, for calculating the cell mechanics, and for performing cell behaviors, $\Delta t_{diff}$, $\Delta t_{mech}$, and $\Delta t_{cells}$ respectively. By default their values are $\Delta t_{diff} = 0.01 min$, $\Delta t_{mech} = 0.1 min$, and $\Delta t_{cells} = 6 min$.
+
+Unlike CPM, in center based models, forces are modeled explicitly, special consideration must be taken to respect the dominance of drag-forces. \pscs does this by modeling the force as acting on the cell's velocity, not on its acceleration.
+
+\subsubsection{Velocity in \psc}\label{sec:abm:center:vel}
+\pscs updates each cell velocity ($\Vec{v}(\sigma)$) according to the force applied to the cell, obeying Equation~\ref{eq:abm:aristotle-said-nothing-wrong}. The cell velocity update, in \pscs, occurs according to the following algorithm:
+% The velocity of a cell in \pscs is give by:
+
+\begin{subequations}\label{eq:abm:physi-vel}
+    \begin{equation}\label{eq:abm:physi-vel:vel}
+        \Vec{v}(\sigma) = \sum_{\sigma'\in\mathcal{N}(\sigma)} \left[-\Vec{\mathcal{A}}(\sigma, \sigma') -\Vec{\mathcal{R}}(\sigma, \sigma')\right] - \Vec{\mathcal{A}}_B(\sigma) - \Vec{\mathcal{R}}_B(\sigma) + \Vec{v}_{mot}(\sigma)\,\,,
+    \end{equation}
+    \begin{equation}\label{eq:abm:physi-vel:cc-ad}
+        \Vec{\mathcal{A}}(\sigma, \sigma') = \sqrt{c_a(\sigma)\,\,c_a(\sigma')}\,\,\,\,\nabla\phi(\Delta\Vec{x}(\sigma, \sigma'), \,\,R_A(\sigma)+R_A(\sigma'))\,\,,
+    \end{equation}
+    \begin{equation}\label{eq:abm:physi-vel:cc-rep}
+        \Vec{\mathcal{R}}(\sigma, \sigma') = \sqrt{c_r(\sigma)\,\, c_r(\sigma')}\,\,\,\, \nabla\psi(\Delta\Vec{x}(\sigma, \sigma'),\,\, R_R(\sigma)+R_R(\sigma'))\,\,,
+    \end{equation}
+    \begin{equation}\label{eq:abm:physi-vel:cb-ad}
+        \Vec{\mathcal{A}}_B(\sigma) = c_{a,b}(\sigma) \,\,\nabla\phi(-\Vec{d}(x(\sigma)), \,\,R_A(\sigma))\,\,,
+    \end{equation}
+    \begin{equation}\label{eq:abm:physi-vel:cb-rep}
+        \Vec{\mathcal{R}}_B(\sigma) = c_{r,b}(\sigma) \,\,\nabla\psi(-\Vec{d}(x(\sigma)), \,\,R_R(\sigma))\,\,.
+    \end{equation}
+\end{subequations}
+
+\noindent Where $\sigma$ is the cell, $\sigma'\in\mathcal{N}(\sigma)$ the cell neighbors of $\sigma$, $\Vec{\mathcal{A}}(\sigma, \sigma')$ is the adhesion force between cells $\sigma$ and $\sigma'$, $\Vec{\mathcal{R}}(\sigma, \sigma')$ the repulsion between cells $\sigma$ and $\sigma'$, $\Vec{\mathcal{A}}_B(\sigma)$ the adhesion of cell $\sigma$ to the basement membrane, $\Vec{\mathcal{R}}_B(\sigma)$ the repulsion of cell $\sigma$ to the basement membrane, and $\Vec{v}_{mot}(\sigma)$ is the cell motility velocity (\textit{i.e.}, persistent cell motion)~\cite{ghaffarizadeh_physicell_2018}. $c_a(\sigma)$ and $c_{a,b}(\sigma)$ are, respectively, the cell's cell-cell and cell-basement adhesion parameters,  $c_r(\sigma)$ and $c_{r,b}(\sigma)$ are, respectively, the cell's cell-cell and cell-basement repulsion parameters~\cite{ghaffarizadeh_physicell_2018}. $\Delta\Vec{x}(\sigma, \sigma')$ is the distance of cell $\sigma$ to cell $\sigma'$ (\textit{i.e.}, $\Delta\Vec{x}(\sigma, \sigma') = \Vec{x}(\sigma) - \Vec{x}(\sigma')$), and $\Vec{d}(x(\sigma))$ the distance from the closest point of the basement membrane to the cell~\cite{ghaffarizadeh_physicell_2018}. 
+
+$\phi(\Vec{x}, R)$ is the adhesion energy potential, and $\psi(\Vec{x}, R)$ the repulsion energy potential. The form of $\nabla\phi(\Vec{x}, R)$ and $\nabla\psi(\Vec{x}, R)$ are given in \psc's supplemental materials~\cite{ghaffarizadeh_physicell_2018}, they are, respectively:
+
+\begin{equation}\label{eq:abm:physi-ad-pot}
+    \nabla\phi(\Vec{x}, R) = \begin{cases}
+        \left(1 - \frac{|\Vec{x}|}{R} \right)\frac{\Vec{x}}{|\Vec{x}|}\,\,\text{, if }|\Vec{x}|\leq R\\
+        0\,\,\text{, otherwise}
+    \end{cases}\,\,,
+\end{equation}
+\noindent and,
+
+\begin{equation}\label{eq:abm:physi-rep-pot}
+    \nabla\psi(\Vec{x}, R) = \begin{cases}
+        -\left(1 - \frac{|\Vec{x}|}{R} \right)\frac{\Vec{x}}{|\Vec{x}|}\,\,\text{, if }|\Vec{x}|\leq R\\
+        0\,\,\text{, otherwise}
+    \end{cases}\,\,.
+\end{equation}
+
+Finally, $\Vec{v}_{mot}(\sigma)$ is cell $\sigma$'s motility. Motility, in \psc, is the persistent motion of the cell~\cite{ghaffarizadeh_physicell_2018}, it can be biased along an arbitrary direction or, more commonly, a chemical field, chemotaxis in \pscs is implemented through $\Vec{v}_{mot}(\sigma)$. At each (mechanics) time-step a cell in \pscs has a probability of changing the motility direction given by
+
+\begin{equation}\label{eq:abm:physi:change-vmot}
+    Pr(\text{new}\,\,\,\Vec{v}_{mot}(\sigma)) = \Delta t_{mech} / \tau_{per}(\sigma)\,\,.
+\end{equation}
+\noindent Where $\tau_{per}$ is the persistence time~\cite{ghaffarizadeh_physicell_2018}. If a velocity update occurs, it will follow
+
+\begin{equation}
+    \Vec{v}_{mot}(\sigma) = s_{mot}(\sigma) \frac{\left(1 - b\right) \hat{\xi} + b \Vec{d}_{bias}(\sigma)}{|\left(1 - b\right) \hat{\xi} + b \Vec{d}_{bias}(\sigma)|}\,\,.
+\end{equation}
+\noindent With $s_{mot}(\sigma)$ the cell speed, $\hat{\xi}$ a random unit vector, $\Vec{d}_{bias}(\sigma)$ the bias direction vector, and $b$ the motility randomness amount~\cite{ghaffarizadeh_physicell_2018}. The $b$ factor  is $\in[0, 1]$, $b=1$ represents a completely deterministic motility direction along $\Vec{d}_{bias}$ and $b=0$ Brownian motion. $\Vec{d}_{bias}(\sigma)$ is determined by the cell state, chemical field interactions, or user-defined factors. If the cell is chemotaxing then $|\Vec{d}_{bias}(\sigma)| > 0$, and the value of $\Vec{d}_{bias}(\sigma)$ is given by:
+\begin{equation}\label{eq:abm:physi:dbias}
+    \Vec{d}_{bias}(\sigma) = \sum_{j=0}^M \lambda_j \nabla c_j \,\,\,.%\frac{\nabla c_j}{|\nabla c_j|}\,\,\,.
+\end{equation}
+\noindent Where $j$ is the index of a chemical field, $\nabla c_j$ the gradient of the field at the cell's position, and $\lambda_j$ the chemotatic sensitivity to that field. If $\lambda_j>0$ then the cell will chemotax towards higher values of $c_j$, if $\lambda_j<0$ it will chemotax towards lower values of $c_j$. The user may opt to use a form of chemotaxis that normalizes the chemical gradient, that case $\nabla c_j $ is replaced by $\nabla c_j / |\nabla c_j |$ in Equation~\ref{eq:abm:physi:dbias}~\cite{ghaffarizadeh_physicell_2018}. If the cell doesn't chemotax then all $\lambda_j=0$.
+
+
+% A cell can change from a chemotaxing state ($|\Vec{d}^{\,\,i}_{bias}| > 0$) to 
+

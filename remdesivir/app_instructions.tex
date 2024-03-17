@@ -1,0 +1,32 @@
+The simulation code as well as the scripts used to analyze the results are hosted in gitHub at \href{https://github.com/JulianoGianlupi/covid-tissue-response-models/}{https://github.com/JulianoGianlupi/covid-tissue-response-models/}, \href{https://github.com/JulianoGianlupi/covid-tissue-response-models/zipball/fossilized-repo/}{download repository}. 
+
+\subsection{CompuCell3D simulations}\label{sup:sec:cc3d_instructions:sims}
+To run the ABM you can use either your personal computer or a cluster. You need to download CompuCell3D version 4.2.3 (or newer, investigations were done in 4.2.3), \url{https://compucell3d.org/SrcBin}. For local installations, run the python script {\fontfamily{qcr}\selectfont cellular-model/batch\_run.py}, and (optionally) define the output directory in the script. For cluster execution, change the output directory in \\*{\fontfamily{qcr}\selectfont cellular-model/batch\_exec.py} and run the script \\*{\fontfamily{qcr}\selectfont cellular-model/batch\_exec.sh}. The script is set up for Slurm scheduling systems. In those files you can define the output directory (variable \linebreak{\fontfamily{qcr}\selectfont sweep\_output\_folder}).
+
+All parameters that were varied and investigated are in the file {\fontfamily{qcr}\selectfont cellular-model/\linebreak investigation\_dictionaries.py} and are imported to {\fontfamily{qcr}\selectfont batch\_run.py} and \linebreak{\fontfamily{qcr}\selectfont batch\_exec.py}. To change the investigated parameters, change the dictionary used as {\fontfamily{qcr}\selectfont mult\_dict} in one of those files. \emph{e.g.}:
+
+\begin{itemize}
+    \item {\fontfamily{qcr}\selectfont mult\_dict = treatment\_starts\_0}, parameters varied in the fine investigation with treatment starting with the infection of 10 epithelial cells
+    \item {\fontfamily{qcr}\selectfont mult\_dict = treatment\_starts\_3\_halved\_half\_life}, parameters varied in the fine investigation with treatment starting3 days post the infection of 10 epithelial cells and with the half life of GS--443902 halved.
+\end{itemize}
+
+Those files also support defining how many replicas to be executed for each parameter combinations to do with the variable {\fontfamily{qcr}\selectfont num\_rep}. The workflow will then run through all combinations of parameters in mult\_dict, generating and running "{\fontfamily{qcr}\selectfont num\_rep}" simulations for each. All results will be stored in "{\fontfamily{qcr}\selectfont sweep\_output\_folder}". Each parameter combination is called a "set" and all results of a set are in their respective folder. \emph{e.g.}, for the following parameter dictionary
+
+\begin{minted}{python}
+treatment_starts_0 = {
+    'first_dose': [0],
+    'dose_interval': [1, 1.5, 2, 2.5, 3,
+        3.5, 4, 4.5, 5, 5.5, 6],
+    'ic50_multiplier': [0.01, 0.02, 0.03, 0.04,
+        0.05, 0.06, 0.07, 0.08,
+        0.09, 0.1],
+    't_half_mult': [1]}
+\end{minted}
+
+\noindent the first set ({\fontfamily{qcr}\selectfont set\_0}) uses {\fontfamily{qcr}\selectfont first\_dose=0}, {\fontfamily{qcr}\selectfont dose\_interval=1}, {\fontfamily{qcr}\selectfont ic50\_multiplier\\*=0.01}, and {\fontfamily{qcr}\selectfont t\_half\_mult=1}. The results for it will be in {\fontfamily{qcr}\selectfont sweep\_output\_folder/\\*set\_0}, each replica will be in {\fontfamily{qcr}\selectfont sweep\_output\_folder/set\_0/run\_0},\, \\*{\fontfamily{qcr}\selectfont sweep\_output\_folder/set\_0/run\_1},\, [...],\, {\fontfamily{qcr}\selectfont sweep\_output\_folder/set\_0/\\*run\_num\_rep}. The second set ({\fontfamily{qcr}\selectfont set\_1}) then uses {\fontfamily{qcr}\selectfont dose\_interval=1.5} and \\*{\fontfamily{qcr}\selectfont ic50\_multiplier=0.01}; and so on.
+
+\subsection{Results analysis}
+
+There are two steps for the analysis of the ABM results, in the first step the median behaviors of the simulation replicas are measured and used for classifying the treatment among the classes defined in the methods section~\ref{sec:remdes:met:quantify_results}. The second step is to, then, generate the parameter variation Figures (\emph{e.g.} Figure~\ref{fig:remdes:res:treat:coarse:diff_vir}).
+
+The file {\fontfamily{qcr}\selectfont cellular-model/grid\_color\_picker.py} does step one. You only need to set the variable {\fontfamily{qcr}\selectfont base\_path} to your path to the "set" folders. Then step two is performed by {\fontfamily{qcr}\selectfont cellular-model/PostMultiSet.py}, change {\fontfamily{qcr}\selectfont base\_path} in it to be the same as in step one.

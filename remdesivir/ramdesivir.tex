@@ -1,0 +1,587 @@
+\chapter{Multiscale Model of Antiviral Timing, Potency, and Heterogeneity Effects on an Epithelial Tissue Patch Infected by SARS-CoV-2}\label{cha:remdes}
+
+\section{Introduction}\label{sec:remdes:intro}
+\input{remdesivir/new_intro}
+
+
+\section{Materials and Methods}\label{sec:remdes:met}
+We sought to compare the spread of infection as represented by the total number of cells infected \textit{versus} time and the viral load \textit{versus} time under different remdesivir treatment schedules. Achieving this goal requires several model components:  (1) viral entry into the target epithelial cells, (2) viral replication within epithelial cells, (3) release of virus and spread of infection within a tissue, (4) immune response and its effect on viral spread within the tissue, (5) the kinetics of the concentration of drug active metabolite as a function of time after dosing and (6) effect of the active metabolite on viral replication within individual infected epithelial cells.
+
+Our computational model includes a multicellular spatial model of SARS-CoV-2 infection of a lung tissue patch composed of epithelial cells, an effective immune response module, and a minimal PK model of available active metabolite of remdesivir in individual epithelial cells. The PK model estimates changes in concentrations of remdesivir triphosphate (GS--443902) in lung epithelial cells after intravenous (IV) infusion of remdesivir in humans. We base our PK model on the Gallo model~\cite{gallo_hybrid_2021}; Gallo's model estimates GS--443902 kinetics in peripheral blood mononuclear cells (PBMC) following IV infusion of remdesivir. We assume that the kinetics of exposure, uptake, and metabolism of the two cell types (PBMC and lung epithelial cells) are similar, although the absolute tissue metabolite concentrations might differ. We describe each sub-model and their integration below.
+
+\subsection{Changes to the \sags model}\label{sec:remdes:met:sego-changes}
+We opt to simulate for 28 days even though the biological realism declines (\emph{e.g.}, lack of tissue recovery or antibody response). Each of our ABM simulations over 28 days took 40 to 100 minutes of computation time on Indiana University's Carbonate super-computer.
+As we are simulating an intervention that aims to contain the spread of infection, differentiating spontaneous results of "\emph{failure to infect}" and effective treatment would be difficult and cumbersome. We, therefore, opted to perform more simulation replicas with the default parameters of the \sags model~\cite{sego_modular_2020} but varying the initial number of infected cells. We ran the \sags model~\cite{sego_modular_2020} with a single infected cell at the start out of 900 epithelial cells (same as in the original), with two infected cells out of 900, five out of 900, and ten out of 900. For each of those initial conditions, we ran 400 simulation replicas.
+
+As mentioned, in the original model~\cite{sego_modular_2020}, the single initially infected cell (out of 900 epithelial cells) is placed in the center of the simulated domain; we randomize the position(s) of our initially infected cell(s). We can quantify the "\emph{failure to infect}" rate and choose a starting condition that fits the goals of this paper. Results of this investigation are in Results~\ref{sec:remdes:res:var_sego}, Figure~\ref{fig:remdes:res:var_sego:uninf_pop}. We find that starting with five initially infected cells eliminates spontaneous failures to infect without resulting in a fast sweep of the tissue by the infection (mean time to full tissue infection stays close to 15 days). 
+
+
+In this study, we extend the viral life-cycle model to include the effects of the antiviral modeled in~\ref{sec:remdes:met:remdes_pk}.
+
+%%%%%%%%%%%%
+\subsection{Remdesivir physiologically based pharmacokinetic model}\label{sec:remdes:met:remdes_pk}
+
+Gallo~\cite{gallo_hybrid_2021} previously published a detailed PBPK model of remdesivir. As we focus on the concentration of the active metabolite of remdesivir in lung epithelial cells, many details of the Gallo model are of limited relevance to our work. Accordingly, we build a parsimonious model to replicate the ADME and intra--cellular availability of remdesivir's active metabolite based on the time-course following IV infusion of remdesivir. We use COPASI~\cite{hoops_copasicomplex_2006} version 4.30 (Build 240) to replicate Gallo's model and build our simplified model. The original PBPK model included 6 differential equations and 12 parameters. Our model assumes that remdesivir is metabolized into its active component (GS--443902) in the target tissue at the infusion rate, as its metabolism into the active metabolite is very rapid in the target tissue~\cite{eastman_remdesivir_2020}, then GS--443902 is eliminated by a first-order process.  Figure~\ref{fig:remdes:met:pk_structure} shows the simplified model structure. The single remaining equation for the PK model representing GS--443902 as a function of the infusion rate of remdesivir is:
+
+\begin{subequations}\label{eq:remdes:pk:gs_conc}
+\begin{equation}\label{eq:remdes:pk:gs_conc:a}
+\frac{d\left(C_{GS}\right)}{dt} = k_{app} D_{rmd} - k_{out} C_{GS}\,\,,
+\end{equation}
+
+\begin{equation}\label{eq:remdes:pk:gs_conc:b}
+    k_{app} = \frac{k_{in}}{vol\,\,\,\tau_{\mathrm{I}}}\,\,,%\Delta t(infusion)}\,\,,
+\end{equation}
+\end{subequations}
+
+
+\noindent
+with $k_{in}$ denoting the uptake rate of GS--443902, $C_{GS}$ the concentration of GS--443902, $D_{rmd}$ the dose of remdesivir, $vol$ the effective compartment volume (in Liters), $\tau_{\mathrm{I}}$ the time required to infuse remdesivir (1h), and $k_{out}$ the excretion rate for the active metabolite. We use $k_{in}$ as the infusion on/off switch. The values for the parameters are in Table~\ref{tab:remdes:pk}. As part of this study, we investigate the effects of schedule on the simulated treatment, \emph{e.g.} remdesivir is given every 48 hours instead of every 24. To keep the total amount of remdesivir administered constant, we change the infusion amount $D_{rmd}$ with the schedule change. \emph{E.g.} the 48h schedule uses a dose of remdesivir that is double that of the 24h schedule, $D_{rmd}(48h) = 2\times D_{rmd}(24h)$. As shown in the Appendix Figure~\ref{sup:fig:gallo_comparisson}, this simple model reproduces the $C_{GS}$ time course within the uncertainty in the Gallo model, including underlying PBMC data as well as the European Union’s compassionate use data~\cite{european_medicines_agency_summary_2020}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=.75\textwidth]{remdesivir/pk_figs/Manuscript_Figure_1.png}
+\caption{Schematic diagram of the minimalized PBPK model of remdesivir. PBMCs are a surrogate for lung alveolar epithelial cells for GS--443902.\label{fig:remdes:met:pk_structure}}
+\end{figure}
+
+\begin{table}[htbp]
+\caption{List of parameters used for the minimal PBPK model of remdesivir.\label{tab:remdes:pk}}
+\begin{tabular}{ccc}
+\hline
+\textbf{Parameter}                        & \textbf{Value}                      & \textbf{Source}                            \\ 
+\hline
+$k_{in}$ (unit-less)                   & 0 or 1                 & Fit to~\cite{humeniuk_safety_2020} \\ 
+\begin{tabular}[c]{@{}c@{}}GS--443902 observed \\ Half-life, $t_{1/2}$ (h)\end{tabular}  & 30.2                       & \cite{humeniuk_safety_2020} \\ 
+\begin{tabular}[c]{@{}c@{}}$k_{out}$, GS--443902's\\decay rate (1/h)\end{tabular}                  & $ln(2)/t_{1/2}$            &                                   \\
+$D_{rmd}$ (mg/day)            & 100 (200 for loading dose) & \begin{tabular}[c]{@{}c@{}}Doses used in \\clinical situations\end{tabular} \\ 
+$vol$ (L)                        & 38.4                       & Fit to~\cite{humeniuk_safety_2020, european_medicines_agency_summary_2020}\\ 
+$\tau_{\mathrm{I}}$ (h)         & 1                          &                                   \\ 
+\hline
+\end{tabular}
+\end{table}
+
+
+
+\subsection{Remdesivir mode of action (MOA) model}\label{sec:remdes:met:remdes_moa}
+
+Remdesivir works as a nucleotide analog by binding to the elongating RNA being synthesized by RdRp~\cite{kokic2021mechanism}. To model this, we extend \sags's~\cite{sego_modular_2020} genome replication Equation~\ref{eq:remdes:vir:replicate} by modifying $r_{max}$ as a function of the cell ($\sigma$) intra--cellular GS--443902 concentration ($C_{GS}(\sigma)$). Thus, we modify Equation~\ref{eq:remdes:vir:replicate} to
+
+\begin{equation}\label{eq:remdes:vir:replicate_mod}
+    \frac{dR}{dt}(\sigma) = r_u U(\sigma) + r'_{max}(\sigma)R(\sigma)\frac{r_{half}}{R(\sigma)+r_{half}} - r_tR(\sigma)\,\,.
+\end{equation}
+
+\noindent We also add the following equation for $r'_{max}$,
+
+\begin{equation}\label{eq:remdes:vir:rmax_modulation}
+    r'_{max}(\sigma) = r_{max}\,\,\frac{IC_{50}^2}{IC_{50}^2+C_{GS}^2(\sigma)} = r_{max}\,\,\frac{1}{1+\left(\frac{C_{GS}(\sigma)}{IC_{50}}\right)^2}\,\,,
+\end{equation}
+
+\noindent
+where $IC_{50}$ refers to GS--443902's intra--cellular $IC_{50}$, the value for $IC_{50}$ is in Table~\ref{tab:remdes:varied_params}. 
+
+The equation for $r'_{max}$ is a inhibitory Hill function. In order to determine the Hill coefficient, we fit a Hill equation to data of SARS-CoV-2 inhibition by remdesivir from Choy \emph{et al.}~\cite{choy_remdesivir_2020} and Pizzorno \emph{et al.}~\cite{pizzorno_vitro_2020}. We found the value of the Hill coefficient in the range from 1 to 4 and chose 2 as the value to be used in the current study. As the intra--cellular $IC_{50}$ for GS--443902 is unknown, especially \emph{in vivo}~\cite{hanafin_mechanismbased_2021, sun2020remdesivir}, we define a base $IC_{50}$ of $7.897\mu mol/L$ using our pharmacokinetics model (see sections~\ref{sec:remdes:met:remdes_pk} and~\ref{sec:remdes:res:pk}, Table~\ref{tab:remdes:pk}, and Figure~\ref{fig:remdes:res:pk}). Our investigation explores different drug potencies or doses by varying this base $IC_{50}$ by using multipliers in the range $[0.01, 10]$ (Table~\ref{tab:remdes:varied_params}).
+%%%%%%%%%%%%
+
+\subsection{Heterogeneous cellular metabolism of remdesivir modeling}\label{sec:remdes:met:intercell_met_var}
+
+The simple remdesivir PK model is present in our multicellular simulations as a component of lung epithelial cells. Each epithelial cell has a synchronized but independent copy of the model, and each cell occupies a different region of space. This method allows us to investigate the effects of heterogeneous metabolism of remdesivir by the epithelial cells. The present model avoids any complex tissue specifications by simulating a tiny patch of lung epithelial tissue. The model focuses how the intercellular heterogeneity of drug metabolism is concerned with the infection outcome. Certainly, there are many other sources of heterogeneity, which we do not consider here to minimize the cross-correlation of the stochasticity from multiple sources of heterogeneity, \textit{e.g.}, distance from blood capillaries, tissue topology, cell age, etc.
+
+We initialize each cell with drug metabolic parameters ($k_{in}$ and $k_{out}$) at the beginning of the simulation. At the same time, to simulate metabolic heterogeneity, we modulate the metabolic parameters with random numbers selected from a Gaussian distribution. For a cell ($\sigma_A$), we draw a random number $\theta(\sigma_A)$ for each of those metabolic parameters, and we then change each metabolic parameter by multiplying it by $1+\theta(\sigma_A)$, \textit{i.e.,}
+
+\begin{equation}\label{eq:remdes:intercell:kindraw}
+    \theta_{in}(\sigma_A) = \mathcal{N}(\mu=0, \xi=0.25)\,\,,
+\end{equation}
+
+\begin{equation}\label{eq:remdes:intercell:mod_kin}
+    k'_{in}(\sigma_A) = k_{in} \,\, (1+\theta_{in}(\sigma_A))\,\,,
+\end{equation}
+
+\begin{equation}\label{eq:remdes:intercell:koutdraw}
+    \theta_{out}(\sigma_A) = \mathcal{N}(\mu=0, \xi=0.25)\,\,,
+\end{equation}
+
+\begin{equation}\label{eq:remdes:intercell:mod_kout}
+    k'_{out}(\sigma_A) = k_{out} \,\, (1+\theta_{out}(\sigma_A))\,\,.
+\end{equation}
+
+\noindent
+$\theta$ is selected from the normal distribution $\mathcal{N}$ with mean $\mu$ (set to 0) and standard deviation $\xi$ (set to 0.25). If $|\theta| > 1$, we draw a new number from $\mathcal{N}$ until $|\theta| \leq 1$. To keep the total metabolic rate over the simulated tissue patch constant, we select another cell ($\sigma_B$) to have its metabolic rates modified by $1-\theta(\sigma_A)$ (the same $\theta$ as for cell $\sigma_A$),
+
+\begin{equation}\label{eq:remdes:intercell:mod_kin_minus}
+    k'_{in}(\sigma_B) = k_{in} \,\, (1-\theta_{in}(\sigma_A))\,\,,
+\end{equation}
+
+\begin{equation}\label{eq:remdes:intercell:mod_kout_minus}
+    k'_{out}(\sigma_B) = k_{out} \,\, (1-\theta_{out}(\sigma_A))\,\,.
+\end{equation}
+
+\noindent A spatial distribution of the modified rate parameters is shown in Figure~\ref{fig:remdes:met:intercell_rates}.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.45\textwidth}
+\includegraphics[width=\textwidth]{remdesivir/spatial_figs/relative_rmd_in_rate_ScalarFieldCellLevel_2D_XY_0_0000.png}
+\caption{}\label{fig:remdes:met:intercell_rates:kin}
+\end{subfigure}
+% \hfill
+% \hspace{-7em}
+\begin{subfigure}{0.45\textwidth}
+\includegraphics[width=\textwidth]{remdesivir/spatial_figs/relative_rmd_out_rate_ScalarFieldCellLevel_2D_XY_0_0000.png}
+\caption{}\label{fig:remdes:met:intercell_rates:kout}
+\end{subfigure}
+\caption{Simulated epithelial cell layers colored by the change in $k_{in}$~\ref{fig:remdes:met:intercell_rates:kin},  $k_{out}$~\ref{fig:remdes:met:intercell_rates:kout}. The values displayed are relative to the base $k_{in}$ and $k_{out}$, a cell colored blue in~\ref{fig:remdes:met:intercell_rates:kout} has, \emph{e.g.}, $k'_{out}(\sigma) = 0.3\times k_{out}$}\label{fig:remdes:met:intercell_rates}
+\end{figure}
+
+ Typical PBPK models do not consider the effects of heterogeneous responses by the cells in the tissue, as each compartment is considered well-mixed. In reality, a cell with rapid clearance of the drug may deplete the intra--cellular antiviral and restart viral production, release and infect neighboring cells. The difference between our model and traditional PBPK models is precisely that our model addresses this spatial heterogeneity issue.
+ 
+
+\begin{table}[!htbp]
+    \centering
+    \caption{List of parameters for the ABM and PD models as well as parameters varied for the treatment effectiveness investigation\label{tab:remdes:varied_params}}
+\begin{tabular}{cc}
+
+\hline
+\textbf{Parameter}                                                                                     & \textbf{Values used}                                                                                                \\ 
+\hline
+Total epithelial population & 900 \\
+\begin{tabular}[c]{@{}c@{}}Number of initially \\ infected cells\end{tabular}                          & 5                                                                                                                   \\ 
+\begin{tabular}[c]{@{}c@{}}Treatment initiation \\ delay (day)\end{tabular}                            & 0, 1, 3                                                                                                             \\ 
+\begin{tabular}[c]{@{}c@{}}Time between \\ antiviral doses\end{tabular}                                & \begin{tabular}[c]{@{}c@{}}8, 12, 24, 36, 48, 60, 72, \\ 84, 96, 108, 120, 132, 144\end{tabular}                    \\ 
+\begin{tabular}[c]{@{}c@{}}Remdesivir doses\\ (rescaled to match \\ the schedules)\\ (mg)\end{tabular} & \begin{tabular}[c]{@{}c@{}}25, 50, 100, 150, 200, 250, 300,\\ 350, 400, 450, 500, 550, 600\end{tabular}             \\ 
+Base $IC_{50}$ ($\mu mol/L$) & $7.897$\\
+\begin{tabular}[c]{@{}c@{}}Viral replication rate reduction (equation \ref{eq:remdes:vir:rmax_modulation}) \\ Hill coefficient\end{tabular} & $2$\\
+$IC_{50}$ multipliers                                                                                  & \begin{tabular}[c]{@{}c@{}}0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, \\ 0.08, 0.09, 0.1, 0.5, 1, 5, 10\end{tabular} \\ 
+\hline
+\end{tabular}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Simulating antiviral treatment regimens and treatment classification metrics}\label{sec:remdes:met:quantify_results}
+
+We simulate a 28-days daily dose regimen for remdesivir, studying the infection dynamics over that time. We initiate remdesivir intervention at different time points with a loading dose followed by a maintenance dose according to our PK model. The dose is rescaled based on the time in-between doses, \textit{i.e.}, if the daily dose is 100mg, the dose every two days is 200mg. 
+
+We start the simulation with five infected cells, and when another five cells are infected, we consider the infection is onset. We initiate treatment 0, 0.5, 1, or 3 days after infection onset. The initial level of infection of a tissue patch can be compared with the infection of a cultured cell population. For \textit{in vivo} infection experiments with woodchuck hepatitis virus (\textit{WHV}), Lew \emph{et al.}~\cite{lew_vitro_2001} found different infectivity and pathogenicity outcomes with different inocula of similar titer concentrations. Beginning with $\approx0.5\%$ (5 out of 900) of tissue cells infected is higher than what would be expected. However, we can imagine our infected tissue patch is surrounded by uninfected tissue that we do not simulate. 
+For each parameter combination, we run eight simulation replicas. We classify simulation results using the median behavior of critical simulation metrics, \emph{e.g.}, the uninfected population. Thus, we can not only differentiate effective from ineffective treatments but also create more specific classifications:
+
+\emph{Rapid clearance} (effective treatment) results from more potent and frequent treatments. Elimination of extracellular virus is achieved in less than 14 days, and there was no subsequent release of the newly generated virus (green plots in Figures~\ref{fig:remdes:res:treat:fine:day0}, \ref{fig:remdes:res:treat:fine:day3}, \ref{fig:remdes:res:treat:half:diff_vir}, \ref{fig:remdes:res:treat:hetero:diff_vir}, and Appendix~\ref{sup:remdes:sec:extra_figures}).
+
+\emph{Slow clearance} (effective treatment): simulations where extracellular virus slowly decreases (over more than 14 days). In some cases new extracellular virus was produced when the antiviral concentration was low, generating an oscillation of the extracellular virus concentration around the decreasing trend. In some slow-clearance simulations, the extracellular virus cleared completely, then infection restarted once the antiviral levels dropped sufficiently (blue plots in Figures~\ref{fig:remdes:res:treat:fine:day0}, \ref{fig:remdes:res:treat:fine:day3}, \ref{fig:remdes:res:treat:half:diff_vir}, \ref{fig:remdes:res:treat:hetero:diff_vir}, and Appendix~\ref{sup:remdes:sec:extra_figures}).
+
+\emph{Partial containment} (partially effective treatment): simulations with a mid-low potency result in a stable level of extracellular virus. Because the treatment is fairly effective, it keeps the viral load very low and the rate of infection of new cells is also very low. Therefore many target-cells remain uninfected throughout the duration of the simulation. The low viral load leads to a low continuum rate of infection of new target-cells roughly balancing the death of virus producing cells and the clearance of extracellular virus. In this scenario, the low dose treatments delay the infection of all target-cells and, thus, delays the onset of target-cell limited viral clearance. However, the treatment by itself is insufficient to eliminate the virus completely during the period simulated. Clearance of this low number of infected cells would likely be achieved by the adaptive immune response, which we do not model. Note that if we ran the simulation long enough we would achieve either target cell-limited clearance or elimination of the virus by the drug. We do not imply that drug treatment makes the infection worse. The rough equilibrium of infection of new cells and viral clearance implies that these simulations are on the transition line separating effective from ineffective treatment. For a longer time between doses, we observe extracellular virus levels oscillating around a steady value (black plots in Figures~\ref{fig:remdes:res:treat:fine:day0}, \ref{fig:remdes:res:treat:fine:day3}, \ref{fig:remdes:res:treat:half:diff_vir}, \ref{fig:remdes:res:treat:hetero:diff_vir}, and Appendix~\ref{sup:remdes:sec:extra_figures}).
+
+\emph{Widespread infection} (ineffective treatment): simulations resulting from sufficiently low potency or large periods in-between doses has the extracellular amount of virus increase during the treatment simulation. Treatment in these cases does not impede infection of all cells and subsequent death of the simulated epithelial tissue occurs. Some simulations have viable cells at the end of simulation with the amount of virus still increasing. Presumably, if run for a longer time, these simulations would also result in complete infection and death of the tissue. This category includes simulations with an observed decrease in extracellular virus towards the end of the simulation; this occurs after the death of all epithelial cells as virus production ceases (target-cell limited clearance) (red plots in Figures~\ref{fig:remdes:res:treat:fine:day0}, \ref{fig:remdes:res:treat:fine:day3}, \ref{fig:remdes:res:treat:half:diff_vir}, \ref{fig:remdes:res:treat:hetero:diff_vir}, and Appendix~\ref{sup:remdes:sec:extra_figures}).
+
+To classify the simulation results among these classes, we first check the median over simulation replicas of the uninfected cell population at the end of the simulation. If they number less than ten or less than half the median uninfected population at the start of treatment, we classify the treatment as ineffective with widespread infection. We then look at the median viral load; if it goes below a threshold and does not rise above it, we classify the results as "effective treatment" with rapid clearance (if cleared in less than 14 days) or slow clearance (otherwise). If the median viral load rises back to levels above the threshold, we look at the median viral load peaks trend. If the peaks are trending to higher levels, we classify the simulation results as ineffective treatment with widespread infection. If the trend is near zero (stable), we classify the results as partial containment. If we observe decreasing trends, we classify the results as slow clearance. Greater detail regarding the definition of these metrics are in Appendix~\ref{sup:remdes:sec:quantify_results}. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Results}\label{sec:remdes:res}
+
+\subsection{Remdesivir PK model}\label{sec:remdes:res:pk}
+
+We first calculate the intra--cellular metabolite concentration over time as a function of dose and dosing schedule. The critical information is the time to accumulate to $IC_{50}$ and how long the concentrations stay above and below values that effectively shut down viral replication.
+
+The intra--cellular $IC_{50}$ of GS--443902 is unknown~\cite{sun2020remdesivir,hanafin_mechanismbased_2021}. To define an $IC_{50}$ for GS--443902 in our simulations and to characterize the GS--443902 concentration time-course and accumulation in our PK simulation we first simulated our PK model to 14 days. We then analyzed the peaks and troughs of the concentration and set the peak-troughs midpoint to be our model's $IC_{50}$ ($7.897\mu mol/L$, Table~\ref{tab:remdes:varied_params}).
+
+% To characterize the GS--443902 concentration time-course and accumulation in our PK simulation, we simulated our PK model to 14 days. 
+
+% We then analyzed the peaks and troughs of the concentration and found 
+
+% , and, as the intra--cellular $IC_{50}$ of GS--443902 is unknown~\cite{sun2020remdesivir,hanafin_mechanismbased_2021}, we chose their midpoint as the concentration we map the $IC_{50}$ to ($7.897\mu mol/L$, Table~\ref{tab:varied_params}) (see Figure~\ref{fig:res:pk:ic50_deter}). 
+
+We then assessed the systems-level effects of different potencies of remdesivir. Clinically, drugs are usually given to achieve plasma concentration of the drug about 5-10 times the $IC_{50}$~\cite{mateus_prediction_2017}. For the potency investigation, we multiply the base $IC_{50}$ by a set of multipliers (in the range of 0.01 to 10, Table~\ref{tab:remdes:varied_params}). We explore dosing regimes in which remdesivir effectively shuts off viral production in all cells; other situations where it leaves a significant number of cells releasing virus at all times; and intermediate situations. Part of our investigation is about the effect of the dosing schedule. We have included the PK concentration profiles to 28 days for all schedules investigated in Figure~\ref{fig:remdes:res:pk:all_profiles}.
+%   height=0.18\textheight
+    % \hspace{\fill}
+    % \vspace{4ex}
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{\textwidth}
+    \centering
+    \includegraphics[width=.48\textwidth]{remdesivir/pk_figs/review/simple-pk-saw-tooth.png} 
+    \caption{} 
+    \label{fig:remdes:res:pk:ic50_deter} 
+  \end{subfigure}
+    \hspace{\fill}
+    \vspace{4ex}
+  
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{remdesivir/pk_figs/review/pk_all_periods_magma.png} 
+    \caption{} 
+    \label{fig:remdes:res:pk:all_profiles} 
+  \end{subfigure} 
+  \hspace{\fill}  %% maximize space between adjacent subfigures
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{remdesivir/pk_figs/review/pk_some_periods_rbk.png} 
+    \caption{} 
+    \label{fig:remdes:res:pk:some_profiles} 
+  \end{subfigure} 
+% \hspace{\fill}
+\caption{\ref{fig:remdes:res:pk:ic50_deter} Concentration of GS--443902 (remdesivir’s active metabolite) for a 14 days treatment with a 200 mg loading dose and 100 mg subsequent daily doses (IV infusion) is obtained by solving Equations~\ref{eq:remdes:pk:gs_conc:a} and~\ref{eq:remdes:pk:gs_conc:a}. Concentration peaks (red) and troughs (blue) are pointed out, their mid-point (dashed line) is our base $IC_{50}$. \ref{fig:remdes:res:pk:all_profiles} Concentrations of the active metabolite, GS--443902, in PK simulations for the different dosing regimens of remdesivir, the doses are rescaled to keep the total average amount of remdesivir given over 24 hours constant. \ref{fig:remdes:res:pk:some_profiles} Some selected PK profiles from \ref{fig:remdes:res:pk:all_profiles}.}\label{fig:remdes:res:pk}
+\end{figure}
+
+
+
+
+\subsection{Variability of outcomes in \sags's model}\label{sec:remdes:res:var_sego}
+
+To understand the effect of treatment, first, we quantify the natural variability of infection progression outcomes in the original model (without any treatment simulation). This variability depends on model parameters, which we do not change from the original \sags model~\cite{sego_modular_2020} and on the initial number of infected cells. 
+
+In the \sags model~\cite{sego_modular_2020}, as discussed previously in Section~\ref{sec:remdes:met:sego_model}, simulations using the base parameters result infection sweeping in the the tissue. However, some simulations using the default parameters show "\emph{failure to infect}", in which the initially-infected cells die before releasing enough virus to infect a substantial number of the remaining cells. This may happen because the initially infected cells are killed by immune system cells, or by viral stress, soon after the simulation starts, while it is in the eclipse phase. The simulation, therefore, ends with almost all cells uninfected. Sego \emph{et al.}~\cite{sego_modular_2020} also demonstrated that their model is capable of immune containment of the infection depending on the simulation parameters.
+
+These "\emph{failure to infect}" results are problematic when we start our treatment investigation. We cannot distinguish for any individual simulation replica in which the infection failed to spread, whether it failed because of the treatment or whether it would have failed to spread regardless of treatment. Distinguishing these cases from effective treatment would require a vast number of replica simulations. We significantly reduce the number of replicas required per parameter set by selecting initial conditions that guarantee widespread infection in the absence of treatment (\textit{i.e.}, eliminating "failures to infect").
+
+As mentioned, we run \sags model~\cite{sego_modular_2020} with a single infected cell at the start out of 900 epithelial cells, with two out of 900, five out of 900, and ten out of 900. To quantify the prevalence of "failures to infect," we run 400 simulation replicates for each of those initial conditions. With a single initially infected cell, 15.75\% of the replicas resulted in failures to infect; with two initially infected cells, there was a 1.25\% rate of "\emph{failure to infect}"; and with five and ten initially infected cells, there were no failures to infect. With a single initially infected cell, the mean time for widespread infection of the simulated patch was 16.04 days (excluding failures to infect), with two initially infected cells, the mean was 27.4 days (excluding failures to infect), with five 18.6 days, and with ten the mean time to full infection was 11.4 days (see Figure~\ref{fig:remdes:res:var_sego:uninf_pop}). 
+
+
+
+\begin{figure}[H]
+\centering
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{remdesivir/sego_var_fig/review/1inf/uninfected_pop.png} 
+    \caption{} 
+    \label{fig:remdes:res:var_sego:uninf_pop:1inf} 
+    % fig:remdes:res:var_sego:uninf_pop:1inf
+  \end{subfigure} 
+  % \hspace{\fill}  %% maximize space between adjacent subfigures
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{remdesivir/sego_var_fig/review/2inf/uninfected_pop.png} 
+    \caption{} 
+    \label{fig:remdes:res:var_sego:uninf_pop:2inf} 
+  \end{subfigure} 
+
+
+    % \vspace{4ex}
+  \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{remdesivir/sego_var_fig/review/5inf/uninfected_pop.png} 
+    \caption{} 
+    \label{fig:remdes:res:var_sego:uninf_pop:5inf} 
+  \end{subfigure} 
+  % \hspace{\fill}
+   \begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{remdesivir/sego_var_fig/review/10inf/uninfected.png} 
+    \caption{} 
+    \label{fig:remdes:res:var_sego:uninf_pop:10inf} 
+  \end{subfigure} 
+\caption{Uninfected cell populations for 400 replicas of the \sags model~\cite{sego_modular_2020} are shown using \sags's default parameters~\cite{sego_modular_2020}. In all the cases the medians of simulation replicas are in black lines, the 0th to 100th quantiles are shaded as dark blue, 10th to 90th shaded in orange, and the 25th to 75th as light blue. \ref{fig:remdes:res:var_sego:uninf_pop:1inf}) Simulations start with 1 initially infected cell and 63 simulations result in "\emph{failure to infect}" (15.75\% of replicas), the 90th quantile includes the upper bound of the number of cells. \ref{fig:remdes:res:var_sego:uninf_pop:2inf}) Simulations start with 2 initially infected cells where 5 simulations result in "\emph{failure to infect}" (1.25\%), the 100th quantile includes the upper bound of the number of cells. \ref{fig:remdes:res:var_sego:uninf_pop:5inf}) Simulations start with 5 initially infected cells. \ref{fig:remdes:res:var_sego:uninf_pop:10inf}) Simulations start with 10 initially infected cells.}\label{fig:remdes:res:var_sego:uninf_pop} 
+\end{figure}
+
+
+
+As the infection starts synchronized, different generations of infected cells were observed at early simulation times (Figure~\ref{fig:remdes:res:var_sego:uninf_pop}). This is observed as a  sharp drop in uninfected cells followed by a less severe infection phase followed by another drop due to the first generations of infected cells releasing virus and dying while the next generation of infected cells is still in the eclipse phase or has not been infected yet. As the simulation progresses, the infection loses its synchronization due to the stochastic effects.
+
+We opt to carry out the remainder of our investigations with five initially infected cells. Initiating simulations with five infected cells removes the failures to infect results (making treatment comparisons easier) while keeping the time to full infection similar to the original. In Figure~\ref{fig:remdes:res:var_sego:load:5inf}, we show the viral load for simulations with five initially infected cells (\textit{i.e.}, the initial condition for our investigation) without any treatment. The viral load peaks around day 10, which is within confidence intervals of measured viral load curves of within-host experimental data. For example, our viral replication model matches data of severe cases of COVID-19 in humans from Yanqun Wang, Lu Zhang, \textit{et al.}~\cite{wang2020kinetics}. In~\cite{wang2020kinetics}, patients with severe COVID-19 had a viral load peak 10-15 days after symptom onset. Those patients also had detectable virus after 20-25 days of symptom onset. In truth, viral load data for SARS-CoV-2 is still messy, especially with the several variants (of concern or not) in circulation (any of which could have different viral kinetics), as seen in Wölfel, Roman, \textit{et al.}~\cite{wolfel2020virological}. In any case, in this work we use SARS-CoV-2 and remdesivir as framing devices, not as the end goal of our simulations. The viral loads, viral production AUC and infected populations in untreated simulations with other initial conditions are in the Appendix~\ref{sup:remdes:sec:untreated-extra}.
+
+\begin{figure}[H]
+\centering
+    \includegraphics[ width=0.75\textwidth]{remdesivir/sego_var_fig/review/5inf/viral_load.png}
+    \caption{Extracellular viral load curve for untreated simulations with five initially infected cells in the tissue patch.}
+    \label{fig:remdes:res:var_sego:load:5inf}
+\end{figure}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Predictive treatment outcomes}\label{sec:remdes:res:treat}
+
+We investigate the effects of frequency, potency, active metabolite half-life, treatment start-time, and tissue heterogeneity on antiviral treatment outcomes for a viral infection on lung epithelial tissue. We model SARS-CoV-2 and remdesivir specifically, our methods are generalizable to other viruses and antivirals. We first investigate the case of homogeneous tissue, beginning with a coarse variation of the $IC_{50}$ multiplier and dose-interval, (in Section~\ref{sec:remdes:res:treat:coarse}). We then do a finer parameter investigation of those parameters to define the precise boundary of effective and ineffective treatment (see Results~\ref{sec:remdes:res:treat:fine}). We then investigate the effects of having a shorter half-life for the active component (see Results~\ref{sec:remdes:res:treat:faster}). Finally, we investigate the heterogeneous metabolism of GS--443902 by epithelial cells (see Results~\ref{sec:remdes:res:treat:hetero}).
+
+\subsubsection{Coarse parameter variation}\label{sec:remdes:res:treat:coarse}
+
+For the coarse parameter investigation, we choose 0.01, 0.05, 0.1, 0.5, 1, 5, and 10 as the $IC_{50}$ multipliers and 8, 12, 24, 48, and 72 hours as the dosing periods (Figure~\ref{fig:remdes:res:treat:coarse}). At this point of the investigation, we do not explore the effect of delaying treatment initiation, all treatments start with the infection of 10 cells, and the cellular metabolic rates are homogeneous. 
+
+The most informative metric to distinguish effective from ineffective treatments is the amount of extracellular diffusive virus. This metric allows us to define subcategories of effective / ineffective treatment. Not surprisingly, we observe that larger $IC_{50}$ multipliers (lower potencies) and larger periods between doses result in higher levels of extracellular virus. 
+
+In this coarse investigation, we see that the simulated system transits from effective to ineffective treatment when the $IC_{50}$ multiplier changes from 0.05 to 0.1 (Figure~\ref{fig:remdes:res:treat:coarse}). However, we do not see dosing interval effects here. 
+
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.8\textwidth}
+\includegraphics[ width=\textwidth]{remdesivir/coarse/metric_num_uninfected_trials.png}
+\caption{}\label{fig:remdes:res:treat:coarse:uninf}
+\end{subfigure}
+% \hfill
+% \vspace*{5pt}
+% \hspace*{\fill}
+% \hspace{-7em}
+\begin{subfigure}{0.8\textwidth}
+\includegraphics[ width=\textwidth]{remdesivir/coarse/metric_diffusive_virus_trials.png}
+\caption{}\label{fig:remdes:res:treat:coarse:diff_vir}
+\end{subfigure}
+\caption{Coarse parameter investigation (10 replicas of the treatment simulation).  Treatment starts with 10 infected cells. For all subfigures the median measurement of simulation replicas is the black line, the 0th to 100th quantiles are shaded as dark blue, 10th to 90th shaded in orange, and 25th to 75th as light blue. Treatments with an $IC_{50}$ multiplier $<0.05$5 contain the infection, while treatments with $IC_{50}$ multiplier $\geq 0.05$ do not. The top two rows show a reduction of viral load due to treatment, while in the lower two rows the decrease is due to all cells being dead \ref{fig:remdes:res:treat:coarse:uninf} Uninfected cell population. \ref{fig:remdes:res:treat:coarse:diff_vir} Extracellular diffusive virus; \textit{y}-axis in log scale, exponent values as tick-marks.}\label{fig:remdes:res:treat:coarse}
+\end{figure}
+
+
+\subsubsection{Fine parameter variation}\label{sec:remdes:res:treat:fine}
+
+ After exploring the effects of coarse model behavior, we focus on the transition region between containment and no containment. $IC_{50}$ multipliers of 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, and 0.1 and dosing periods of 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, and 6 days are explored (Figures~\ref{fig:remdes:res:treat:fine:day0} and \ref{fig:remdes:res:treat:fine:day3}). 
+ 
+ The results presented here are the measurements of uninfected population and diffusing virus for simulations where treatment starts with the infection of ten epithelial cells (Figure~\ref{fig:remdes:res:treat:fine:day0}) and simulations where we delay treatment initiation by three days (Figure~\ref{fig:remdes:res:treat:fine:day3}). For figures of the other metrics (number of dead cells, cytokine levels, \emph{etc.}) and simulations where treatment starts 12 hours and one day after the infection of ten epithelial cells see Appendix~\ref{sup:sec:extra_figures:homo_regular}. We investigate the effects of diminishing GS--443902 's half-life by 50\% and by 75\% in Section~\ref{sec:remdes:res:treat:faster} and Appendices~\ref{sup:sec:extra_figures:homo_halved} and~\ref{sup:sec:extra_figures:homo_quartered}. And the effects of heterogeneous metabolism of GS--443902 in Section~\ref{sec:remdes:res:treat:hetero} and Appendix~\ref{sup:sec:extra_figures:hetero_regular}.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.8\textwidth}
+\includegraphics[ width=\textwidth]{remdesivir/homogeneous_day0/metric_num_uninfected_trials.png}
+\caption{}\label{fig:remdes:res:treat:fine:day0:uninf}
+\end{subfigure}
+% \hfill
+% \vspace*{5pt}
+% \hspace*{\fill}
+% \hspace{-7em}
+\begin{subfigure}{0.8\textwidth}
+\includegraphics[ width=\textwidth]{remdesivir/homogeneous_day0/metric_diffusive_virus_trials.png}
+\caption{}\label{fig:remdes:res:treat:fine:day0:diff_vir}
+\end{subfigure}
+\caption{Treatment starts with the infection of 10 epithelial cells. For all subfigures the median measurement of simulation replicas is the black line, the 0th to 100th quantiles are shaded as dark blue, 10th to 90th shaded in orange, and 25th to 75th as light blue. Rapid clearance plot axis in green, slow clearance plot axis in blue, partial containment in black, widespread infection in red.
+ \ref{fig:remdes:res:treat:fine:day0:uninf} Uninfected cell population. \ref{fig:remdes:res:treat:fine:day0:diff_vir} Extracellular diffusive virus; \emph{y} axis in log scale, exponent values as tick-marks.}\label{fig:remdes:res:treat:fine:day0}
+\end{figure}
+
+In Figure~\ref{fig:remdes:res:treat:fine:day0}, there is no delay to treatment start. The system transits from effective treatment to ineffective treatment upon changing the $IC_{50}$ multiplier from 0.05 to 0.07. We also see the effects of drug dosing frequency; for the $IC_{50}$ multiplier of 0.05, the treatment outcome shifts from fast clearance to slow clearance when we change the scheduling period from 72h to 108h. For the $IC_{50}$ multiplier of 0.06, we see the transition from slow clearance to partial containment when we change the period from 96h to 108h.
+
+ In Figure~\ref{fig:remdes:res:treat:fine:day3}, we delay treatment by three days. We can see that the system traverses from effective treatment to ineffective treatment upon changing the $IC_{50}$ multiplier from 0.04 to a multiplier of 0.06. Here the effects of drug dosing frequency are more pronounced, with several transitions happening for a single $IC_{50}$ multiplier. For instance, with an $IC_{50}$ multiplier of 0.05, the simulated treatment moves from fast clearance to slow clearance to partial containment as time in-between doses becomes progressively longer. 
+ 
+ 
+ 
+In the cases of infrequent dosing or mid-high-potency treatments, we observe a situation in which extracellular virus concentrations fall below the "cleared" threshold and then reappear. The viral resurgence happens if infected cells remain and the level of remdesivir between doses falls to a point where viral replication can restart after the clearance of the extracellular virus. Even with reappearance, however, levels of the extracellular virus do not increase beyond the first peak in concentration. 
+
+We observe an effect that seems counter-intuitive for simulations with longer inter--dose periods and intermediate potencies. There is a more significant decrease in extracellular virus for the first few days of treatment, indicating a (temporarily) more effective treatment than for the same potency with more frequent dosing. This occurs because the duration of viral replication is constrained by the duration that the antiviral concentration is above the effective concentration that inhibits viral replication. This time period is longer for larger doses. For longer inter--dose intervals the amount per dose is larger (for an inter--dose interval of $n$ days, the dose $D'$ is $n$ times the amount of the standard dose ($D$), \textit{i.e.}, $D' = n \times D$). Thus, the duration of inhibition of viral replication after a dose is longer for longer inter--dose intervals. The fact that the loading dose, $D_L$, is twice the regular dose; $D_L= 2 \times D'$, makes this effect even stronger for the initial inter--dose period. In particular, it is possible that for a longer dose interval, the drug concentration never decreases below the effective concentration between the first and second doses, but decreases below the effective concentration during the intervals between all subsequent doses.
+
+% We attribute this result to rescaling the initial dose. As in the longer period simulations, we rescale the initial dose to be higher to expose the simulated tissue to the same time-corrected amount.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.8\textwidth}
+\includegraphics[ width=\textwidth]{remdesivir/homogeneous_day3/metric_num_uninfected_trials.png}
+\caption{}\label{fig:remdes:res:treat:fine:day3:uninf}
+\end{subfigure}
+% \hfill
+% \vspace*{5pt}
+% \hspace*{\fill}
+% \hspace{-7em}
+\begin{subfigure}{0.8\textwidth}
+\includegraphics[ width=\textwidth]{remdesivir/homogeneous_day3/metric_diffusive_virus_trials.png}
+\caption{}\label{fig:remdes:res:treat:fine:day3:diff_vir}
+\end{subfigure}
+\caption{Treatment starts three days post the infection of 10 epithelial cells. For all subfigures the median measurement of simulation replicas is the black line, the 0th to 100th quantiles are shaded as dark blue, 10th to 90th shaded in orange, and 25th to 75th as light blue. Rapid clearance plot axis in green, slow clearance plot axis in blue, partial containment in black, widespread infection in red.
+ \ref{fig:remdes:res:treat:fine:day3:uninf} Uninfected cell population. \ref{fig:remdes:res:treat:fine:day3:diff_vir} Extracellular diffusive virus; \emph{y}-axis in log scale, exponent values as tick-marks.}\label{fig:remdes:res:treat:fine:day3}
+\end{figure}
+
+
+We show spatial configuration snapshots from replica simulations of the virtual tissue patches for the four classes in Figure~\ref{fig:remdes:res:treat:fine:spacial_config_classes}.
+
+
+\begin{figure}[H]
+\centering
+    \includegraphics[ width=0.75\textwidth]{remdesivir/homogeneous_day3/four_spatial_in_one.png} % redo figure
+    \caption{Replica snapshots of the tissue patch are shown for different treatment classifications. In all the cases the top row is the epithelial layer (blue uninfected cells, green infected cells in eclipse phase, red infected cells releasing virus, black dead cells), middle row is the extracellular virus concentrations (high concentration in red, low concentration in blue), and the third row is the immune cell layer (immune cells in red, extracellular environment in black). \textbf{A)} fast  clearance (36h dosing period, 0.01 $IC_{50}$ multiplier), \textbf{B)} slow clearance (84h dosing period, 0.05 $IC_{50}$ multiplier), \textbf{C)} partial containment (84h dosing period, 0.06 $IC_{50}$ multiplier), \textbf{D)} widespread infection (108h dosing period, 0.07 $IC_{50}$ multiplier). In all the cases snapshots are shown at the start of the simulation (day 0), at the start of treatment (3 days post infection of 10 cells), after 14 days of treatment, and at the end of the simulation (Day 28).}
+    \label{fig:remdes:res:treat:fine:spacial_config_classes}
+\end{figure}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Faster clearing drug necessitates more potent antiviral in order to contain the infection}\label{sec:remdes:res:treat:faster}
+
+
+We evaluated the effects of increased drug clearance on tissue outcomes. Specifically, we reduced the half-life of GS--443902 by 50\% (from 30.4h to 15.2h) (see Figure~\ref{fig:remdes:res:treat:half:diff_vir} and Appendix~\ref{sup:sec:extra_figures:homo_halved}), or by 75\% (to 7.6h) (see Appendix~\ref{sup:sec:extra_figures:homo_quartered}). With the faster clearing drug, we observe a general effect of shifting the region of effective treatment to greater potencies (smaller $IC_{50}$ multiplier); however, there is no similar shift towards more frequent doses schedules.
+
+With the half-life of GS--443902 reduced to 15.2h and no delay to treatment initiation, we classify many more treatments as ineffective than treatments using the regular half-life and delaying treatment by three days.
+
+\begin{figure}[H]
+\centering
+    \includegraphics[ width=0.8\textwidth]{remdesivir/halved_t0.5/day_0/metric_diffusive_virus_trials.png}
+    \caption{Extracellular diffusive virus populations for 8 replicas of the treatment simulation. Treatment starts with the infection of 10 cells, the half-life of GS--443902 was halved (to 15.2h). For all subfigures the median measurement of simulation replicas is the black line, the 0th to 100th quantiles are shaded as dark blue, 10th to 90th shaded in orange, and 25th to 75th as light blue. Rapid clearance plot axis in green, slow clearance plot axis in blue, partial containment in black, widespread infection in red.}
+    \label{fig:remdes:res:treat:half:diff_vir}
+\end{figure}
+
+Initiating treatment later, at one or three days post-infection of ten epithelial cells, pushed outcomes to widespread infection (see Appendix~\ref{sup:sec:extra_figures:homo_halved}). However, as most treatments are already ineffective with the faster clearing antiviral, few options were pushed to ineffectiveness.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Heterogeneous cellular metabolism of remdesivir results}\label{sec:remdes:res:treat:hetero}
+
+Now we vary the metabolic rates of the antiviral in each epithelial cell individually, as detailed in the Methods Section~\ref{sec:remdes:met:intercell_met_var}. We see that heterogeneous drug metabolism and clearance result in an overall worse treatment outcome. We believe this occurs due to infection being driven forward by the cells that generate the most extracellular virus; we test this hypothesis in Results~\ref{sec:remdes:res:superspreaders}. If there is a region of cells with good drug metabolism (the antiviral is effective) but one among them is insensitive, the infection will progress.
+
+For the heterogeneous cellular metabolism simulations, treatment shifts from effective to ineffective when we change the $IC_{50}$ multiplier from 0.03 to 0.05 (Figure~\ref{fig:remdes:res:treat:hetero:diff_vir}) instead of 0.04 to 0.06 for the homogeneous case  (Figure~\ref{fig:remdes:res:treat:fine:day3}), both when there is no delay to treatment initiation and with delay. However, when there is no delay, the 0.05 $IC_{50}$ multiplier results in mostly partial containment, and the 0.03  $IC_{50}$ multiplier guarantees clearance. When we delay treatment by three days, 0.05 $IC_{50}$ multiplier results in mostly widespread infections, and the 0.03 $IC_{50}$ multiplier is close to the slow clearance -- partial containment transition. Even the best-case scenario, starting treatment with the infection of ten epithelial cells with heterogeneous metabolism, yields worse outcomes than the worst-case scenario, starting treatment three days after the infection of 10 epithelial cells, for the homogeneous case.  
+
+For the heterogeneous cell response simulations, changing treatment initiation time has a more pronounced effect than the homogeneous case,  see Figure~\ref{fig:remdes:res:treat:hetero:diff_vir} and Appendix~\ref{sup:sec:extra_figures:hetero_regular:day1}. For instance, when we delay treatment by 1 or 3 days  (Figure~\ref{fig:remdes:res:treat:hetero:diff_vir:day3} and Appendix~\ref{sup:sec:extra_figures:hetero_regular:day1}), most treatments for an $IC_{50}$ multiplier of 0.3 become almost ineffective (slow clearance) from most being classified as fast clearance when there is no delay (Figure~\ref{fig:remdes:res:treat:hetero:diff_vir:day0}). For an $IC_{50}$ multiplier of 0.05, we classify all except one treatment option as partial containment with no delay (Figure~\ref{fig:remdes:res:treat:hetero:diff_vir:day0}). In contrast, we classify most infection dynamics as widespread infection with a delay of 1 or 3 days (Appendix~\ref{sup:sec:extra_figures:hetero_regular:day1}, Figure~\ref{fig:remdes:res:treat:hetero:diff_vir:day3}).
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.8\textwidth}
+\includegraphics[ width=\textwidth]{remdesivir/heterogeneous/day3/metric_num_uninfected_trials.png}
+\caption{}\label{fig:remdes:res:treat:hetero:diff_vir:day0}
+\end{subfigure}
+% \hfill
+% \vspace*{5pt}
+% \hspace*{\fill}
+% \hspace{-7em}
+\begin{subfigure}{0.8\textwidth}
+\includegraphics[ width=\textwidth]{remdesivir/heterogeneous/day3/metric_diffusive_virus_trials.png}
+\caption{}\label{fig:remdes:res:treat:hetero:diff_vir:day3}
+\end{subfigure}
+\caption{Extracellular diffusive virus populations for eight replicas of the treatment simulation. Epithelial cells' metabolism and clearance varies from cell to cell. For all subfigures the median measurement of simulation replicas is the black line, the 0th to 100th quantiles are shaded as dark blue, 10th to 90th shaded in orange, and 25th to 75th as light blue. Rapid clearance plot axis in green, slow clearance plot axis in blue, partial containment in black, widespread infection in red.
+ \ref{fig:remdes:res:treat:hetero:diff_vir:day0} Treatment starts with the infection of 10 cells. \ref{fig:remdes:res:treat:hetero:diff_vir:day3} Treatment starts three days post the infection of 10 cells.}\label{fig:remdes:res:treat:hetero:diff_vir}
+\end{figure}
+
+
+\subsubsection{Factors responsible for negative treatment outcomes in the heterogeneous metabolism model}\label{sec:remdes:res:superspreaders}
+
+As cellular heterogeneous metabolic response worsens treatment outcomes, we perform simulations tracking viral production (viral AUC) by individual cells. We hypothesized that the infection is driven forwards by the cells that are least sensitive to the antiviral. We selected four parameter combinations used in Figure~\ref{fig:remdes:res:treat:hetero:diff_vir:day3} (\emph{i.e.}, simulations with  treatment delayed by three days), one from each classification, to perform simulations investigating the viral production by individual cells. The parameter sets chosen are:
+
+\begin{itemize}
+    \item Rapid clearance: 24 hours dose interval, 0.01 $IC_{50}$ multiplier;
+    \item Slow clearance: 120 hours dose interval, 0.03 $IC_{50}$ multiplier;
+    \item Partial containment: 96 hours dose interval, 0.06 $IC_{50}$ multiplier;
+    \item Widespread infection: 24 hours dose interval, 0.1 $IC_{50}$ multiplier.
+\end{itemize}
+
+In these simulations, we vary either $k_{in}$ (Figure~\ref{fig:remdes:res:treat:super:in}) or $k_{out}$ (Figure~\ref{fig:remdes:res:treat:super:out}). We measure the per-cell viral production and see the production--metabolic rate relationship. If our hypothesis is correct, we would expect with $k_{in}$ increase, the average intra--cellular concentration of antiviral increases subsequently, and the viral production would decrease. For $k_{out}$, we would expect the opposite correlation. With increasing $k_{out}$, the intra--cellular viral concentration decreases and viral production will increase.
+
+As before, we run four simulation replicas for each parameter set. We then combine the replicas' per cell viral production data, separate the cells into 50 bins of the metabolic rate range (either $k_{in}$ or $k_{out}$), and calculate the mean production in each bin.
+
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+\includegraphics[width=\textwidth]{remdesivir/met_rate_viral_production_correlation/b3_4d_0.06/in_normed_mean_production.eps}
+\caption{}\label{fig:remdes:res:treat:super:in}
+\end{subfigure}
+%
+\begin{subfigure}[b]{0.48\textwidth}
+\includegraphics[width=\textwidth]{remdesivir/met_rate_viral_production_correlation/b4_1d_0.1/out_normed_mean_production.eps}
+\caption{}\label{fig:remdes:res:treat:super:out}
+\end{subfigure}
+\caption{Mean viral production of cells versus their relative metabolic rates normalized by the maximum mean production with partial containment parameters.
+ \ref{fig:remdes:res:treat:super:in} Results for simulations varying only $k_{in}$, uses the partial containment parameter set. \ref{fig:remdes:res:treat:super:out} Results for simulations varying only $k_{out}$, uses the widespread infection parameter set.}\label{fig:remdes:res:treat:super}
+\end{figure}
+
+Figure~\ref{fig:remdes:res:treat:super} shows the results for the parameter sets that had the most evident correlation. Namely the partial containment set for $k_{in}$ and widespread infection set for $k_{out}$. We see that the hypothesis of super spreader cells is reasonable, as the correlation of metabolic rates and viral production agrees as we would hypothesized. As $k_{in}$ increases, viral production decreases and as $k_{out}$ increases, viral production increases. Outliers are escaping the trend at the limits of the metabolic rates. Several factors explain these outliers, such as the time a cell releases virus before dying. On top of that, the distribution of rates is not uniform but a normal distribution (see Methods~\ref{sec:remdes:met:intercell_met_var}). As the number of cells with either high or low metabolic rates will be low, the \textit{mean production} of cells with high or low metabolic rates is more likely to have fluctuations. 
+
+The least sensitive cells to the antiviral drive forward the infection and complement a recent result from Reinharz \emph{et al.}~\cite{reinharz_understanding_2021}. They have shown that cellular heterogeneity in interferon signaling response has the effect of improving tissue outcomes. Antiviral resistance due to interferon depends on the cells that produce the most interferon (effectively warning other cells of the infection).
+
+For the other parameter sets see Appendix~\ref{sup:remdes:sec:super_spreaders}. As there are several sources of heterogeneity in the model, the antiviral-metabolic rate \textit{vs.} viral production correlation can be less apparent, which is the case for the results in Appendix~\ref{sup:remdes:sec:super_spreaders}. For instance, the correlation is weak if the infection spreads fast (killing virus producing cells early) or is contained quickly (making the number of infected cells low). Weak correlation can also arise from the infected cells dying before or shortly after releasing the virus to the environment.
+
+\subsubsection{Effects of variability in cellular drug metabolism on treatment outcomes}\label{sec:remdes:res:change-sd}
+
+
+To quantify the effects of variability in cellular drug metabolism on treatment outcome, we simulated tissues with different levels of variability. This was done by changing the modulation parameter of the metabolic rates, $k_{in}$ and  $k_{out}$ in Equations~\ref{eq:remdes:intercell:kindraw} and~\ref{eq:remdes:intercell:koutdraw}. For the results so far, in Equations~\ref{eq:remdes:intercell:kindraw} and~\ref{eq:remdes:intercell:koutdraw} we modulated the metabolic rates by drawing a random number from a Gaussian distribution with mean ($\mu$) set to 0 and standard deviation ($\xi$) set to 0.25. Here we perform simulations with $\xi=0.1$ (see Figure~\ref{fig:remdes:res:change-sd:0.1sd}) and $\xi=0.5$ (see Figure~\ref{fig:remdes:res:change-sd:0.5sd}). With a $\xi=0.1$ most treatment outcomes that are classified as rapid or slow clearances in the homogeneous case remain effective. In contrast, with a $\xi=0.5$, almost all treatments are ineffective. We map the boundary of effective-ineffective treatments (Figure~\ref{fig:remdes:res:change-sd:boundary}) by plotting the centers of simulations classified as slow clearance. We observe that the boundary moves towards lower $IC_{50}$ multipliers (\textit{i.e.}, more potent drugs would be needed). We also saw that the increase of metabolic variability made the boundary less dependent on the dosing interval. Other metrics for these simulations can be found in Appendix~\ref{sup:sec:extra_figures:hetero_other_sd}. In summary, with a lower variability of cell metabolism, treatment outcomes were closer to those of uniform cell metabolism; whereas, with a higher variability most treatments became ineffective.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.8\textwidth}
+\centering
+\includegraphics[width=\textwidth]{remdesivir/heterogeneous/review/sd_0.1/metric_diffusive_virus_trials.png}
+\caption{}\label{fig:remdes:res:change-sd:0.1sd}
+\end{subfigure}
+%
+\begin{subfigure}{0.8\textwidth}
+\centering
+\includegraphics[ width=\textwidth]{remdesivir/heterogeneous/review/sd_0.5/metric_diffusive_virus_trials.png}
+\caption{}\label{fig:remdes:res:change-sd:0.5sd}
+\end{subfigure}
+\caption{
+Extracellular diffusive virus populations for eight replicas of the treatment simulation. Epithelial cells' metabolism and clearance varies from cell to cell. For all subfigures the median measurement of simulation replicas is the black line, the 0th to 100th quantiles are shaded as dark blue, 10th to 90th shaded in orange, and 25th to 75th as light blue. Rapid clearance plot axis in green, slow clearance plot axis in blue, partial containment in black, widespread infection in red.
+ \ref{fig:remdes:res:change-sd:0.1sd} Cells' metabolism standard deviation set to 0.1. \ref{fig:remdes:res:change-sd:0.5sd} Cells' metabolism standard deviation set to 0.5.}\label{fig:remdes:res:change-sd}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[ width=0.7\textwidth]{remdesivir/effects_of_sd/effective_ineffective_trans.png}
+    \caption{Ineffective-effective treatment transition border for different levels of metabolic variability. In blue is the homogeneous metabolism case, in black the heterogeneous metabolism case applying a modulation by a Gaussian random number with standard deviation (S.D.) set to 0.1 for $k_{in}$ and $k_{out}$, in red the heterogeneous case with the Gaussian random number S.D. set to 0.25, in green with the S.D. set to 0.5.}
+    \label{fig:remdes:res:change-sd:boundary}
+\end{figure}
+
+
+To appreciate the effects of cellular metabolic heterogeneity on treatment outcome, we compare intra--cellular viral RNA levels in untreated cases to the same with treatment at different levels of heterogeneity (\textit{i.e.} different $\xi$). Quantifying intra--cellular RNA is not straightforward, as the time of infection of different cells varies, and the total number of infected cells at a given time also varies. Therefore, we consider how to aggregate cells and measure intra--cellular RNA. We opt to measure the viral RNA levels only for infected cells that release virus to the extra cellular environment (\textit{i.e.}, that have exited the eclipse phase of infection), as they are further along in the disease progression and will have the highest intra--cellular RNA levels. It is also important to note that growth of RNA level in cells under ineffective or no--treatment is exponential, therefore mean RNA levels can be dominated by a small number of cells until they perish due to viral production stress. We see such cases as spikes in RNA levels followed by a rapid decay in Figure~\ref{fig:remdes:res:change-sd:compare}.
+
+For the intra--cellular RNA level comparison we have one set of simulations with no treatment at all, and for the treated simulations we choose a set of treatment parameters that yielded results classified as rapid clearance when there is no metabolic heterogeneity, as slow clearance with the metabolic heterogeneity $\xi$ set to $0.1$, as partial containment with $\xi=0.25$, and as widespread infection with $\xi=0.5$.  Chosen treatment parameters are: delay treatment for one day, dose every 24h, $IC_{50}$ multiplier of 0.05.
+
+In Figure~\ref{fig:remdes:res:change-sd:compare}, we show the mean and standard deviation of RNA levels in virus-producing cells for 5 sets of simulations with the simulation replicas of each set plotted individually, both for the untreated case (see Figure~\ref{fig:remdes:res:change-sd:compare:rna:notreat}) and with treatment (see Figures~\ref{fig:remdes:res:change-sd:compare:rna:no}, \ref{fig:remdes:res:change-sd:compare:rna:0.1}, \ref{fig:remdes:res:change-sd:compare:rna:0.25}, and~\ref{fig:remdes:res:change-sd:compare:rna:0.5}). We want to point out that the scales of Figure~\ref{fig:remdes:res:change-sd:compare}'s subfigures are not the same, so that the change in RNA level can be seen for all cases.
+
+\begin{figure}[H]
+\centering
+ \begin{subfigure}[b]{\textwidth}
+    \centering
+    \includegraphics[width=.48\textwidth]{remdesivir/effects_of_sd/no_treat/rna.png} 
+    \caption{} 
+    \label{fig:remdes:res:change-sd:compare:rna:notreat} 
+  \end{subfigure}
+%   height=0.18\textheight
+    \hspace{\fill}
+    \vspace{4ex}
+  
+  \begin{subfigure}[b]{0.48\linewidth}
+    % \centering
+    \includegraphics[width=\textwidth]{remdesivir/effects_of_sd/no_intercell/RNA.png} 
+    \caption{} 
+    \label{fig:remdes:res:change-sd:compare:rna:no} 
+  \end{subfigure} 
+  \hspace{\fill}  %% maximize space between adjacent subfigures
+  \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\textwidth]{remdesivir/effects_of_sd/intercell/RNA_0.1sd.png} 
+    \caption{} 
+    \label{fig:remdes:res:change-sd:compare:rna:0.1} 
+  \end{subfigure} 
+
+
+    \vspace{4ex}
+  \begin{subfigure}[b]{0.48\linewidth}
+    % \centering
+    \includegraphics[width=\textwidth]{remdesivir/effects_of_sd/intercell/RNA_0.25sd.png} 
+    \caption{} 
+    \label{fig:remdes:res:change-sd:compare:rna:0.25} 
+  \end{subfigure} 
+  \hspace{\fill}
+   \begin{subfigure}[b]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\textwidth]{remdesivir/effects_of_sd/intercell/RNA_0.5sd.png} 
+    \caption{} 
+    \label{fig:remdes:res:change-sd:compare:rna:0.5} 
+  \end{subfigure} 
+\caption{Mean RNA levels in virus-releasing infected cells (solid lines) with standard deviation (shaded regions) versus time for individual simulation replicates under different simulation options. Sub-figure~\ref{fig:remdes:res:change-sd:compare:rna:notreat} is untreated. Sub-figure~\ref{fig:remdes:res:change-sd:compare:rna:no} is treated with no metabolic heterogeneity, \ref{fig:remdes:res:change-sd:compare:rna:0.1} is treated with a metabolism standard deviation of 0.1, \ref{fig:remdes:res:change-sd:compare:rna:0.25} is treated with a metabolism standard deviation of 0.25, and \ref{fig:remdes:res:change-sd:compare:rna:0.5} is treated with a metabolism standard deviation of 0.5. Please note that the y-range in~\ref{fig:remdes:res:change-sd:compare:rna:notreat} and~\ref{fig:remdes:res:change-sd:compare:rna:no} differ from the others.}\label{fig:remdes:res:change-sd:compare} 
+\end{figure}
+Without any treatment, mean RNA levels in virus-producing cells stay stable at a level of 12 arbitrary units until the end of the simulation, when RNA levels in the few surviving epithelial cells shoot up. Before that time there are cells with high levels of internal viral RNA but the mean level is brought down by cells that are earlier in the infection stage. With treatment and no inter--cellular metabolic heterogeneity the intra--cellular RNA levels in virus-producing cells stay low, below 2 A.U., for the entire treatment duration and RNA levels among cells are similar (low standard deviation). We also see that as treatment progresses the mean RNA levels steadily decrease, and we see a periodic effect from the dosing interval. This is to be expected when treatment is effective and all cells respond to treatment identically (see Figure~\ref{fig:remdes:res:change-sd:compare:rna:no}). As we increase metabolic heterogeneity ($\xi$) the mean intra--cellular RNA levels also increase as does the variation of intra--cellular RNA levels among cells. We also start to see spikes in the mean intra--cellular RNA levels related to cells that do not control viral replication internally (one spike for $\xi=0.1$, several for $\xi>0.1$), where in those cells the RNA growth is exponential. As soon as those cells die the mean intra--cellular RNA drops back down to a steady level. When we use $\xi=0.5$ in Equations~\ref{eq:remdes:intercell:kindraw} and~\ref{eq:remdes:intercell:koutdraw} the RNA levels oscillate in a similar range to that of the untreated case. In Appendix~\ref{sup:sec:extra_figures:hetero_other_sd:drug-levels} we show how changing the metabolic heterogeneity affects the average and distribution of intra--cellular drug levels in these simulations. In short, when $\xi=0.1$ intra--cellular drug levels stay close to the homogeneous metabolism case. With $\xi=0.25$ intra--cellular drug concentrations are more spread--out, and with some cells at levels that are double or half the mean. With $\xi=0.5$ there are cells with 0 intra--cellular drug concentration and cells with intra--cellular concentrations as much as 3 times greater than the mean.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\section{Discussion}\label{sec:remdes:dis}
+% TODO WILL/MUST BE REDUCED, PARTS OF CONTENT WILL GO TO DISCUSSION}
+Our model of antiviral treatment of COVID-19 integrates a spatio-temporal model of an infected lung tissue patch with remdesivir PK and PD models. This approach allows us to probe the distribution, dynamics, and effects of remdesivir within a hypothetical pathological tissue structure. 
+
+This work is part of a collaborative effort. The modeling framework is extendable and modular. Models of other viruses and therapies can replace our viral model and PK-PD models.
+
+Computational methods are a necessary complement to experimental efforts moving forward in the fight against COVID-19, future pandemics and current diseases. The combined complexities of the pathogen, disease pathology, immune response (both innate and adaptive), antiviral dynamics, and host variation, including variation in the basics units of the body,  make it virtually impossible to disentangle the numerous driving forces behind infection outcomes using only animal and human data. Furthermore, experimental data are often sparse, and computational models can expand the explanatory power of limited experimental data. Our modular approach captures and integrates these dynamics to help translate biomedical mechanisms to clinical relevance. 
+
+We characterize the infection and treatment dynamics of an epithelial patch infected by SARS-CoV-2 and treated with remdesivir, at dose regimens encompassing those approved clinically. To create our model, we used reported human pharmacokinetics of remdesivir and its active metabolite and physiologically relevant within-host viral dynamics. We have considered the PK model profile of remdesivir to calculate the concentration of the drug in each cell, while assuming, at first, that the availability of drug to each cell is equal (well--mixed conditions).  The lung tissue concentration of all of the remdesivir metabolites are not evident in any reported biomedical study, therefore we estimated them from their plasma concentrations using pharmacokinetic models~\cite{humeniuk_safety_2020,hu2021pharmacokinetics, european_medicines_agency_summary_2020}.% We then break the well mixed conditions by introducing cell metabolic heterogeneity.}
+
+
+% Without spatial characterization, we cannot model significant stochastic and local effects. The main finding of this study is that if cells have heterogeneous metabolism of an antiviral, it exacerbates the effects of delaying treatment. E.g., when metabolism is homogeneous, delaying treatment by three days requires a $\approx25\%$ more potent drug to contain the infection to a similar extent than no delay (Results~\ref{sec:remdes:res:treat:fine}). However, if cells' metabolism is heterogeneous, delaying treatment by three days requires a  $\approx50\%$ more potent drug (Results~\ref{sec:res:treat:hetero}), with metabolic heterogeneity $\xi=0.25$.
+
+We simulate multiple regimens for antiviral therapy on top of our extendable framework. We aimed to explore if the unconvincing results of antiviral trials and their clinical use could be explained by exploring the effects of changes in drug potency and schedule and some unknown possibilities. We found that the same dosing regimen and the same parameter set different replicas can have different outcomes. Furthermore, we found that if the cellular metabolism of the antiviral changes from cell-to-cell, simulation outcomes are more dispersed, and the effective antiviral dose is greater. Altogether that means that two identical patients receiving the same identical treatment could have different outcomes. We believe this explains some of the ambiguity of the clinical trials.
+
+The spatial model enables exploration of the effects of inter--cellular heterogeneous response to the antiviral, even with a lack of experimental data on how different cells of the same tissue may react and metabolize drug compounds differently. Therefore, we perform simulated experiments to investigate how that variation in metabolism may affect treatment outcomes. Our model predicts that cells that are less sensitive to the drug drive the infection, necessitating higher antiviral doses or the need for a more potent antiviral activity (by $>50\%$ depending on level of heterogeneity and treatment delay) (see Results~\ref{sec:remdes:res:treat:fine}, \ref{sec:remdes:res:treat:hetero}, and~\ref{sec:remdes:res:change-sd}). Therefore, experimental studies that investigate what are the typical metabolic variations in a tissue would enable the development of models that fit even better with reality. A pure population model of infection would not predict that cellular heterogeneity increases the antiviral potency needed for effective control of the infection, as they cannot model inter--cellular heterogeneity in space.% The lung tissue concentration of all of the remdesivir metabolites are not evident in any reported biomedical study, therefore we estimated them from their plasma concentrations using pharmacokinetic models~\cite{humeniuk_safety_2020,hu2021pharmacokinetics, european_medicines_agency_summary_2020}.}
+
+% Spatial mechanisms are one of the significant sources of biological stochasticity that influences treatment outcomes. The spatial model enables exploration of the effects of inter--cellular heterogeneous response to the antiviral and predicts that cells that are less sensitive to the drug drive the infection, necessitating higher \textcolor{blue}{antiviral doses (by $>50\%$ depending on level of heterogeneity and treatment delay)} or the need for a more potent antiviral activity. However, a population model of infection would not predict that cellular heterogeneity increases the antiviral potency needed for effective control of the infection, as they cannot model inter--cellular heterogeneity.
+
+% We show that suboptimal exposure to the simulated antiviral inside simulated infected epithelial tissues leads to regrowth of viral load between doses and may contribute to persistent COVID-19. \textcolor{blue}{This result aligns with the reported experiments in non-human primate, rhesus macaques~\cite{kim2021incomplete, dobrovolny_quantifying_2020, williamson2020clinical}.} %Experimenting with treatment initiation time as performed in~\cite{kim2021incomplete}, }. 
+
+% Without spatial characterization, we cannot model significant stochastic and local effects. The main finding of this study is that if cells have heterogeneous metabolism of an antiviral, it exacerbates the effects of delaying treatment. E.g., when metabolism is homogeneous, delaying treatment by three days requires a $\approx25\%$ more potent drug to contain the infection to a similar extent than no delay (Results~\ref{sec:remdes:res:treat:fine}). However, if cells' metabolism is heterogeneous, delaying treatment by three days requires a  $\approx50\%$ more potent drug (Results~\ref{sec:res:treat:hetero}).
+
+As expected, the model predicted that remdesivir exposure, both to adequate doses of antiviral and in the amount of time with adequate levels, is a crucial determinant of treatment outcome, implying that increased dose amount would improve treatment outcome. We show that suboptimal exposure to the simulated antiviral inside simulated infected epithelial tissues leads to regrowth of viral load between doses and may contribute to persistent COVID-19. This result aligns with the reported experiments in non-human primate, rhesus macaques~\cite{kim2021incomplete, dobrovolny_quantifying_2020, williamson2020clinical}.
+
+However, we do not model drug-induced toxicity, which is a concern at high doses and limits the clinically safe dose. We also predicted the continued significance of host mechanisms during treatment, such as metabolic clearance of the antiviral (see Results~\ref{sec:remdes:res:superspreaders}). Identification and ranking of these host mechanisms identifies potential targets for therapy development~\cite{abani_tocilizumab_2021,chen_corticosteroid_2021}.  Potential strategies include treatment utilizing a neutralizing antibody cocktail or convalescent plasma to boost host immunity or fast viral clearance. Here, we want to comment that the present study is a mathematical and mechanistic exploration of possible scenarios. The present model simulates a tiny patch of epithelial tissue and cannot predict clinical outcomes at the whole-body level. The present model lacks a well-defined immune response that allows natural clearance of the virus. The antibody-mediated viral neutralization and antibody-dependent cellular cytotoxicity is not considered in the present model, hence the second, rapid clearance phase is not observed in the viraemic loads of our simulations. We also recognize that the present set of simulations aggregate rather than explore, the different sources of heterogeneity and variability. Future work should explore the sources of heterogeneity, incorporate the antibody therapies with an improved, well-defined immune response model, as well as of tissue recovery. In turn, improved immune response modeling will help us determine the cross-talk between antibody cocktails with the host immune response while reducing the viral burden. Because of these results, we believe that researchers must consider host mechanisms, viral load, and drug permeability as part of the design space combining immuno-modulation and antiviral treatment of COVID-19 and other viral diseases.
+
+% We simulated multiple regimens for antiviral therapy on top of our extendable framework. We aimed to explore if the unconvincing results of antiviral trials and their clinical use could be explained by exploring the effects of changes in drug potency and schedule and some unknown possibilities. We found that the same dosing regimen and the same parameter set different replicas can have different outcomes. Furthermore, we found that if the cellular metabolism of the antiviral changes from cell-to-cell, simulation outcomes are more dispersed, and the effective antiviral dose is greater. Altogether that means that two identical patients receiving the same identical treatment could have different outcomes. We believe this explains some of the ambiguity of the clinical trials.
+
+% Estimates of drug potency from an \textit{in vivo} or overall within-host model may not apply universally to all organs/tissues. For example, to date, remdesivir active metabolite concentrations in lung tissue have not been measured directly.
+
+The main finding of this paper is the effects of heterogeneity in cellular metabolism (uptake and clearance) on viral replication. Even in the presence of spatial stochasticity, identical cellular behavior predicted better outcomes for the antiviral treatment. In contrast, including cellular heterogeneity worsened the treatment outcomes and produced results that are more similar to previous clinical trial outcomes than the homogeneous setup~\cite{wang2020remdesivir}. This discrepancy of model prediction and clinical trials may be a limitation of traditional pharmacometrics models that utilize the well-stirred assumption. As employed in this study, incorporating tissue heterogeneity may be important to improve the clinical trial simulation.
+
+Clinical trials of antivirals for COVID-19 remain fraught with limitations, including the inability to test drugs singularly or in combinations, high cost, and the long duration of clinical trials. The most significant limitation of antiviral trials as treatment is that antivirals need to be given early in infection, which is a challenging issue for SARS-CoV-2, where there is an appreciable delay between infection and symptom onset. Animal models play an essential role in identifying new and effective regimens, but these studies are also time-consuming and costly, and they require models with human-like pathology. Here we provide a complementary systems pharmacology tool for predicting the efficacy of new drugs and regimens, allowing a rapid assessment of drug efficacy at the site of viral infection while considering cellular heterogeneity.
