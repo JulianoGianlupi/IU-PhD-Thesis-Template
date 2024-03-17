@@ -1,0 +1,35 @@
+The general code sequence for an agent-based model using PhenoCellPy begins with the initialization of the Phenotype and its attachment to the relevant agents at simulation-time 0. Then, at each time-step, the Phenotype time-stepping method should be called for each agent with a Phenotype, and the boolean flags for cell phase change, cell removal from the simulation, and division used as needed. An example pseudo-code of a framework using PhenoCellPy can be found in Algorithm~\ref{algo:sequence:init}
+
+
+\begin{algorithm}[H]
+\SetAlgoLined
+    \caption{Pseudo-code showing Phenotype initialization, attachment to agents, and time-stepping}\label{algo:sequence:init}
+    % import PhenoCellPy as pcp\;
+    dt $\gets$ time step length\;
+    t $\gets$ 0\;
+    T $\gets$ maximum time step\;
+    Phenotype $\gets$ Phenotype(dt=dt, other initialization options)\;
+    \For{Agent in List of Agents}{
+        Agent Phenotype $\gets$ Phenotype\;
+        Other Agent Initialization Tasks\;
+    }
+    
+    \While{$t \leq T$}{
+        Pre-Agent-Loop Tasks\;
+        \For{Agent in List of Agents}{
+            changed phase, removal, divides $\gets$ return from Agent Phenotype Time-Step call\;
+            \If{changed phase is True}{
+                Phase change tasks\;
+            }
+            \If{removal is True}{
+                Call Modeling Framework's Agent Removal Method on Agent\;
+            }
+            \If{divides is True}{
+                 Call Modeling Framework's Agent Division Method on Agent\;
+            }
+            Other Agent Tasks\;
+        }
+        Post-Agent-Loop Tasks\;
+        t $\gets$ t + dt\;
+    }
+\end{algorithm}

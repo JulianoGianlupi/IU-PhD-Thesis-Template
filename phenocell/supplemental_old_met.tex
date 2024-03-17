@@ -1,0 +1,19 @@
+\section{\pcps Python implementation}\label{sec:meth-old}
+
+
+Besides defining several methods and functions to drive PhenoCellPy, we allow users to define custom functions. The user-definable functions are: \code{entry\_function(*args)}, \code{exit\_function(*args)}, \code{arrest\_function(*args)}, \\*\code{user\_phenotype\_time\_step(*args)}, \\*\code{user\_phase\_time\_step(*args)}. Which are executed at Phase entry, Phase exit, to determine if a cell should exit the Phenotype and enter senescence (see Sections~\ref{sec:meth:phase} and~\ref{sec:meth:pheno}), and at each time-step. We also allow the user to define the Phase transition function (see Section~\ref{sec:meth:phase:trans}). All functions that can be user-defined in PhenoCellPy \textbf{must} accept any number of optional parameters (\textit{i.e.}, be a "python args" function). For instance, for viral infection the end of the eclipse phase will occur when a threshold of internal viral load is reached~\cite{sego_modular_2020}, so the modeler would pass the intra-cellular viral load and the threshold as arguments to the function. Some pre-packaged Phases (\textit{e.g.}, \code{NecrosisSwell}, \code{S}) use the custom entry function to change their Cell Volume model target volumes. 
+
+We would like to note that, for formatting reasons, we've removed the docstrings and most comments from the functions presented in this section. The actual source-code for PhenoCellPy contains docstrings for all functions and comments where necessary.
+
+\subsection{Cellular Phase}\label{sec:methsec:meth-old:phase}
+\input{phenocell/phase_met.tex}
+
+
+\subsection{Cellular Phenotype}\label{sec:methsec:meth-old:pheno}
+\input{phenocell/pheno_met.tex}
+
+\subsection{Cellular Volume}\label{sec:methsec:meth-old:vol}
+\input{phenocell/vol_met.tex}
+
+% \subsection{Example Pseudo-Code of PhenoCellPy Use}\label{sec:methsec:meth-old:seq}
+% \input{sequence_met.tex}

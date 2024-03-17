@@ -1,0 +1,69 @@
+The update volume function is shown in Listing~\ref{code:vol:update}. It takes as arguments, in order, the time-step length ($dt$), $r_F$, $r_{NS}$, $r_{CS}$, and $r_C$. For stability reasons, we use SciPy's \code{odeint} function~\cite{2020SciPy-NMeth} to solve the volume dynamics, together with an intermediary function \code{volume\_relaxation} (see Listing~\ref{code:vol:relax}). 
+
+\begin{listing}[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+def update_volume(self, dt, fluid_change_rate, 
+    nuclear_volume_change_rate,
+    cytoplasm_volume_change_rate, calcification_rate):
+        dt_array = array([0, dt])
+        self.fluid = odeint(self.volume_relaxation, self.fluid, 
+        dt_array,
+                        args=(fluid_change_rate, 
+                            self.target_fluid_fraction * self.total))\
+                            [-1][0]
+        self.nuclear_fluid = (self.nuclear / (self.total + 1e-12)) * \
+                                self.fluid
+        self.cytoplasm_fluid = self.fluid - self.nuclear_fluid
+        self.nuclear_solid = odeint(self.volume_relaxation, 
+                                self.nuclear_solid, 
+                                dt_array,
+                                args=(nuclear_volume_change_rate, 
+                                      self.nuclear_solid_target))[-1][0]
+        self.cytoplasm_solid_target = \
+            self.target_cytoplasm_to_nuclear_ratio * \
+                self.nuclear_solid_target
+        self.cytoplasm_solid = odeint(
+                                self.volume_relaxation, 
+                                self.cytoplasm_solid, dt_array,
+                                args=(cytoplasm_volume_change_rate, 
+                                    self.cytoplasm_solid_target))[-1][0]
+        self.solid = self.nuclear_solid + self.cytoplasm_solid 
+        self.nuclear = self.nuclear_solid + self.nuclear_fluid
+        self.cytoplasm = self.cytoplasm_fluid + self.cytoplasm_solid
+        self.calcified_fraction = odeint(
+                                    self.volume_relaxation, 
+                                    self.calcified_fraction, dt_array,
+                                    args=(calcification_rate, 1))[-1][0]
+        self.total = self.cytoplasm + self.nuclear
+        self.fluid_fraction = self.fluid / (self.total + 1e-12)
+\end{minted}
+\caption{Cell Volume class \code{update\_volume} function.}\label{code:vol:update}
+\end{listing}
+
+\begin{listing}[!htbp]
+\begin{minted}[
+frame=lines,
+framesep=2mm,
+baselinestretch=1.2,
+bgcolor=light-gray,
+fontsize=\footnotesize,
+linenos
+]{python}
+@staticmethod
+def volume_relaxation(current_volume, t, rate, target_volume):
+    dvdt = rate * (target_volume - current_volume)
+    return dvdt
+\end{minted}
+\caption{Intermediary \code{volume\_relaxation} function.}\label{code:vol:relax}
+\end{listing}
+
+
+\subsubsection{Cellular Volume defaults and init function}
+The Cellular Volume \code{\_\_init\_\_} function checks if the user defined custom values, checks that they are sensible (e.g., that there are no negative volume, or fractional volumes $\notin [0, 1]$), and initializes the class' attributes. 

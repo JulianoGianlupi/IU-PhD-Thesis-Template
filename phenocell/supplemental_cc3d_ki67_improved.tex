@@ -1,0 +1,141 @@
+\section{Ki-67 Basic Cycle Improved Division Implementation in CompuCell3D}\label{suplemental:cc3d-ex:ki67-improved}
+Note: we have removed the implementation of population statistics, data saving, and plots from the code presented here. In places this would cause an error we have added a \code{pass} statement. The model that comes packaged with PhenoCellPy does include population statistics, data saving, and plots.
+
+
+\begin{python}
+from cc3d.cpp.PlayerPython import *
+from cc3d import CompuCellSetup
+from cc3d.core.PySteppables import *
+from numpy import median, quantile, nan
+import sys
+sys.path.extend(["C:\\PhenoCellPy"])
+import Phenotypes as pheno
+def Ki67pos_transition(*args):
+    # print(len(args), print(args))
+    # args = [cc3d cell volume, phase's target volume, time in phase, phase duration
+    return args[0] >= args[1] and args[2] > args[3]
+
+class ConstraintInitializerSteppable(SteppableBasePy):
+    def __init__(self, frequency=1):
+        SteppableBasePy.__init__(self, frequency)
+        self.track_cell_level_scalar_attribute(field_name='phase_index_plus_1', attribute_name='phase_index_plus_1')
+        self.target_volume = None
+        self.doubling_volume = None
+        self.volume_conversion_unit = None
+
+    def start(self):
+        side = 10
+        self.target_volume = side * side
+        self.doubling_volume = 2 * self.target_volume
+        x = self.dim.x // 2 - side // 2
+        y = self.dim.x // 2 - side // 2
+        cell = self.new_cell(self.CELL)
+        self.cell_field[x:x + side, y:y + side, 0] = cell
+        dt = 5  # 5 min/mcs
+        ki67_basic_modified_transition = \ 
+            pheno.phenotypes.Ki67Basic(dt=dt,
+                transitions_to_next_phase=[None,
+                    Ki67pos_transition],
+                transitions_to_next_phase_args=[None,
+                    [-9, 1, -9, 1]])
+        self.volume_conversion_unit = self.target_volume / \
+            ki67_basic_modified_transition.current_phase.volume.total
+        for cell in self.cell_list:
+            cell.targetVolume = self.target_volume
+            cell.lambdaVolume = 2.0
+            pheno.utils.add_phenotype_to_CC3D_cell(cell, 
+                ki67_basic_modified_transition)
+            cell.dict["phase_index_plus_1"] = \
+                cell.dict["phenotype"].current_phase.index + 1
+        self.shared_steppable_vars["constraints"] = self
+        
+class MitosisSteppable(MitosisSteppableBase):
+    def __init__(self, frequency=1):
+        MitosisSteppableBase.__init__(self, frequency)
+        self.constraint_vars = None
+        self.previous_number_cells = 0
+        self.plot = True
+        self.save = False
+        if self.save:
+            pass
+    def start(self):
+        self.constraint_vars = self.shared_steppable_vars["constraints"]
+        if self.plot:
+            pass
+    def step(self, mcs):
+        if not mcs and self.plot:
+            pass
+        elif not mcs % 50 and \ 
+            len(self.cell_list) - self.previous_number_cells > 0 \
+            and self.plot:
+            pass
+        cells_to_divide = []
+        n_zero = 0
+        n_one = 0
+        volumes = []
+        time_spent_in_0 = []
+        time_spent_in_1 = []
+        for cell in self.cell_list:
+            volumes.append(cell.volume)
+            cell.dict["phenotype"].current_phase.simulated_cell_volume = cell.volume
+            if cell.dict["phenotype"].current_phase.index == 0:
+                n_zero += 1
+                time_spent_in_0.append(cell.dict["phenotype"].current_phase.time_in_phase)
+            elif cell.dict["phenotype"].current_phase.index == 1:
+                n_one += 1
+                time_spent_in_1.append(cell.dict["phenotype"].current_phase.time_in_phase)
+                # args = [cc3d cell volume, 
+                #        doubling colume, 
+                #        time in phase, 
+                #        phase duration]
+                args = [
+                    cell.volume,
+                    .9 * self.constraint_vars.doubling_volume,  
+                    # we use 90\% of the doubling volume because cc3d cells
+                    # will always be slightly below their target due to the contact energy
+                    cell.dict["phenotype"].current_phase.time_in_phase \ 
+                        + cell.dict["phenotype"].dt,
+                    cell.dict["phenotype"].current_phase.phase_duration]
+                cell.dict["phenotype"].current_phase.
+                    transition_to_next_phase_args = \ 
+                    args
+            changed_phase, should_be_removed, divides = \ 
+                cell.dict["phenotype"].time_step_phenotype()
+            converted_volume = \ 
+                self.constraint_vars.volume_conversion_unit * \
+                    cell.dict["phenotype"].current_phase.volume.total
+            cell.targetVolume = converted_volume
+            if changed_phase:
+                cell.dict["phase_index_plus_1"] = \ 
+                    cell.dict["phenotype"].current_phase.index + 1
+            if divides:
+                cells_to_divide.append(cell)
+        if self.save or self.plot:
+            pass
+        for cell in cells_to_divide:
+            # self.divide_cell_random_orientation(cell)
+            # Other valid options
+            # self.divide_cell_orientation_vector_based(cell,1,1,0)
+            # self.divide_cell_along_major_axis(cell)
+            self.divide_cell_along_minor_axis(cell)
+
+    def update_attributes(self):
+        # resetting target volume
+        converted_volume = \ 
+            self.constraint_vars.volume_conversion_unit * \
+                self.parent_cell.dict["phenotype"].current_phase.volume.total
+        self.parent_cell.targetVolume = converted_volume
+        self.clone_parent_2_child()
+        self.parent_cell.dict["phase_index_plus_1"] = \ 
+            self.parent_cell.dict["phenotype"].current_phase.index + 1
+        self.child_cell.dict["phase_index_plus_1"] = \ 
+            self.child_cell.dict["phenotype"].current_phase.index + 1
+        self.child_cell.dict["phenotype"].time_in_phenotype = 0
+    def on_stop(self):
+        self.finish()
+    def finish(self):
+        if self.save:
+            pass
+\end{python}
+
+

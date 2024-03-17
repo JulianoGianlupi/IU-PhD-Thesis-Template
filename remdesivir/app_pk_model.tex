@@ -1,0 +1,78 @@
+
+Gallo~\cite{gallo_hybrid_2021} developed a model to predict the intracellular concentration of rem\-des\-ivir triphosphate (GS--443902) after IV infusion of remdesivir in humans. Their model is based on measurement of GS--443902 in peripheral blood mononuclear cells (PBMC) following IV infusion of remdesivir. That model is then used as a surrogate for predicting the concentration in lung cells assuming the exposure, uptake and metab\-o\-lism of the two cell types are similar. Here we develop a simpler model designed to just predict the GS--443902 concentration in lung cells based on the data and model of Gallo, along with data from Humeniuk \emph{et al.}~\cite{humeniuk_safety_2020}, and with additional PBMC data from the Gilead application to the European Medicines Agency's for the compassionate use of remdesivir to treat COVID-19 patients~\cite{noauthor_copasicomplex_nodate}. The goal of this model is simply to estimate reasonable tissue concentrations of GS--443902 versus time as a function of remdesivir dose in repetitive dosing scenarios. These dosing scenarios are like those used by Gallo and in the compassionate use document. The model layout is shown in Figure~\ref{fig:remdes:met:pk_structure} (in the main paper) and the ordinary differential equations, %in Figure~\ref{fig:app:pk_ode}.
+
+% \begin{figure}[H]
+%  %% \includegraphics[width=10.5 cm]{pk_figs/copai-odes.png}
+
+\begin{equation}\label{sup:eq:pk_ode:1}
+\frac{\text{d}(C_{GS}\cdot vol)}{\text{d}t} =
+\left(\frac{D_{rmd}\cdot k_{in}}{\tau_{\mathrm{I}}}\right)
+- vol\cdot k_{out}\cdot C_{GS} \,\,,
+\end{equation}
+
+%%\begin{equation}
+%%\frac{\text{d}([GS443902\_source]\cdot V_{Body})}{\text{d}t} = -
+%%\left(\frac{Remdes\_dose\_mol\cdot %%k\_in}{Infusion\_duration}\right)
+%%\end{equation}
+
+%%\begin{equation}
+%%\frac{\text{d}([GS443902\_sink]\cdot V_{Body})}{\text{d}t} = 
+%%V_{Body}\cdot k\_out\cdot [GS443902]
+%%\end{equation}
+
+\begin{equation}\label{sup:eq:pk_ode:2}
+\frac{\text{d}(C_{GS}^{AUC})}{\text{d}t} = C_{GS}\,\,.
+\end{equation}
+
+% \caption{\label{fig:app:pk_ode}}
+% \end{figure}
+
+\noindent Differential equations for the minimized remdesivir PK model. Note that $vol$ in Equations~\ref{sup:eq:pk_ode:1} and~\ref{sup:eq:pk_ode:2}, in Figure~\ref{fig:remdes:met:pk_structure} and in Table~\ref{tab:remdes:pk}, and is the effective volume of the single compartment in the model. Here, $D_{rmd}$ is in mols. The model's input for remdesivir is in milligrams, which the COPASI code converts to moles (\emph{e.g.}, "Remdes\_dose\_mol") so that conversion of remdesivir to GS--443902 is one-to-one.
+
+Our simplified model was constructed in COPASI (http://copasi.org), an SBML compliant biochemical system simulator well suited for modeling chemical and biological processes represented by ordinary differential equations (ODEs). COPASI allows for easy model definition, including the use of links to biological ontologies for unique identification of species and concepts, as well as a suite of tools for running simulations, parameter fitting, sensitivity analysis etc. The COPASI file (which is setup to do the parameter estimation task) along with the parameter files based on Gallo, Humeniuk \emph{et al.}\ and the compassionate use document are available at \href{https://github.com/JulianoGianlupi/covid-tissue-response-models/}{https://github.com/JulianoGianlupi/covid-tissue-response-models/}, or the entire repository can be downloaded from  \\*\href{https://github.com/JulianoGianlupi/covid-tissue-response-models/zipball/fossilized-repo/}{https://github.com/JulianoGianlupi/covid-tissue-response-models/zipball/fossilized-repo/}. \\*Table~\ref{tab:appendix:pk_data} summarizes the parameters and measurements from the Humeniuk study and compassionate use documents that we used to calibrate our model.
+
+\begin{table}[H] 
+\caption{Data used to calibrate the simple remdesivir to GS--443902 prediction model. *Humeniuk's Table 4 in~\cite{humeniuk_safety_2020}; **EU Compassionate Use's Table 16 in~\cite{noauthor_copasicomplex_nodate}; *** Infusion duration not given, assumed to be 1 hour.\label{tab:appendix:pk_data}}
+\begin{tabular}{ccccc}
+% \toprule
+\textbf{Parameter}     & \textbf{Unit} & \textbf{\begin{tabular}[c]{@{}c@{}}Humeniuk*\\ Cohort 7\end{tabular}} & \textbf{\begin{tabular}[c]{@{}c@{}}Humeniuk*\\ Cohort 8\end{tabular}} & \textbf{\begin{tabular}[c]{@{}c@{}}EU\\ Compassionate Use**\end{tabular}} \\ 
+% \midrule
+Remdesivir Dose        & mg            & 150                                                                   & 75                                                                    & 200                                                                       \\ 
+Infusion Duration      & h             & 2                                                                     & 0.5                                                                   & 1.0 ***                                                                     \\ 
+GS--443902 $C_{max}$    & uM            & 6.0                                                                   & 5.9                                                                   & 9.8                                                                       \\ 
+GS--443902 $C_{24hr}$   & uM            & 3.7                                                                   & 3.3                                                                   & 6.9                                                                       \\ 
+GS--443902 $t_{1/2}$    & 1/h           & 36                                                                    & 49                                                                    &                                                                           \\ 
+GS--443902 $AUC_{24h}$  & h*uM          &                                                                       &                                                                       & 157.4                                                                     \\ 
+GS--443902 $AUC_{inf}$  & h*uM          & 297                                                                   & 394                                                                   &                                                                           \\ 
+GS--443902 $AUC_{last}$ & h*uM          & 272                                                                   & 340                                                                   &                                                                           \\ 
+% \bottomrule
+\end{tabular}
+\end{table} 
+
+\begin{figure}[H]
+\includegraphics[width=10.5 cm]{remdesivir/pk_figs/gallo_predicted.png}
+\caption{Comparison of our simplified model to Gallo's population simulation plot of predicted intracellular lung GS--443902 concentration. Gallo's  mean response is shown by the black line and the 95\% interval is shaded. This data is from 5000 simulations in which the two key parameters in the Gallo model were sampled from distributions with 20\% CV. See Gallo and their supplement Figure S5 for more information. Blue line is our simplified model's output. The Gallo data used in this plot was digitized from the publication using\newline\url{https://automeris.io/WebPlotDigitizer/}.
+\label{sup:fig:gallo_comparisson}}
+\end{figure}
+
+\subsection{COPASI Codes}
+The COPASI model files are available on GitHub as described earlier. Simulations were developed in COPASI version 4.30 (Build 240) and have been checked through version version 4.34 (Build 251). Below we give details for running the two models.
+
+\subsubsection{COPASI model file for parameter fitting}
+The file {\fontfamily{qcr}\selectfont GS-443902\_PBMC\_PK\_v05\_3data\_plusEurope.cps} does the parameter estimation task based on the 
+data of~\cite{humeniuk_safety_2020}. The data files are included in the GitHub repository.
+This COPASI file is set up to do both the parameter fitting task and a basic time course simulation. Load the file in COPASI and insure that the following data files are in the same folder that contains the COPASI .cps file:
+
+\begin{itemize}
+  \item {\fontfamily{qcr}\selectfont Humeniuk\_PK\_data\_Europe\_Table\_16.txt}
+  \item {\fontfamily{qcr}\selectfont Humeniuk\_PK\_data\_Table\_4\_Cohort7.txt}
+  \item  {\fontfamily{qcr}\selectfont Humeniuk\_PK\_data\_Table\_4\_Cohort8.txt}
+\end{itemize}
+
+ \noindent The COPASI model implements the infusion period with an event named "Infusion", which changes the variable  "$k_{in}$" from 1 to 0 when the model's time exceeds the length of the "$\tau_I$" parameter (see Equation~\ref{sup:eq:pk_ode:1} and the COPASI code). Several other events are used to determine the $T_{max}$, $C_{max}$, AUC at 24 hours etc. The remdesivir dose is input in milligrams and converted to moles by the COPASI code.
+ % fig:met:pk_structure
+ To run the parameter estimation, select "Task", "Parameter Estimation", then select an estimation method. We used the "Particle Swarm" method with the default values. In the Upper right of the COPASI window the button "Experimental Data" will open the data window. If the data files listed above are in the same directory as the .cps file then this should be populated with the data mappings for each of the three files. These values are also summarized in Table~\ref{tab:appendix:pk_data}. In the upper right of the COPASI window click the "update model" checkbox so the fitted parameters are updated into the starting values for the COPASI model. Click "Run" and the parameter are estimated and available on the  "Results" sub-item. The Particle Swarm should iterate down to an objective value of about $6.2x10^{-11}$. The models has now been updated with the results for the terminal clearance half life and the effective compartment volume, typically 30.2 hours and 38.4 liters, respectively. A time course can be run using these parameters by selecting "Tasks", "Time Course" then "Run". This COPASI model generate several graphs, some of which are for the fitting task and some for the time course task. 
+
+\subsubsection{COPASI model file for calculating GS--443902 from repetitive remdesivir doses}
+
+The file {\fontfamily{qcr}\selectfont GS-443902\_PBMC\_PK\_v05\_3data\_repeatDose\_Gallo.cps} \hfill  simulates repetitive doses of 200, then 100x4mg/day. This model is based on the parameter fitting model described above. The variable $k_{in}$ controls the infusion periods as well as the infusion dose since it can be thought of as a multiplier on the infusion dose (see Equation~\ref{sup:eq:pk_ode:1}). During the initial infusion $k_{in}$ is 1 and in subsequent infusion periods 0.5 to implement the initial 2x loading dose. This factor in combination with the remdesivir dose (Remdes\_dose\_mg) value gives the 200mg then four times 100 mg dosing pattern. The infusion timing is shown in the "$k_{in}$" plot generated by the COPASI code. Loading this model into COPASI, then "Task", "Time Course", "Run" produces output similar to what is shown in Figure~\ref{sup:fig:gallo_comparisson}. Note that the maximum units in COPASI on the Y-axis are mole/liter with values near $10^{-5}mol/L$, which corresponds to the $\sim 10\mu M$ values in Figure~\ref{sup:fig:gallo_comparisson}.

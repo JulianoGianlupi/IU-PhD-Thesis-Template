@@ -1,15 +1,32 @@
 \begin{appendices}
-
+\begingroup
+\renewcommand{\newpage}{}
+\renewcommand{\cleardoublepage}{}
+\renewcommand{\clearpage}{}
+\let\cleardoublepage\relax
+\let\clearpage\relax
+\vspace{6em}
+\appendixpage
+\endgroup
 %Some Table of Contents entry formatting
 \addtocontents{toc}{\protect\renewcommand{\protect\cftchappresnum}{\appendixname\space}}
 \addtocontents{toc}{\protect\renewcommand{\protect\cftchapnumwidth}{6em}}
 
 %Begin individual appendices, separated as chapters
+\begingroup
+\renewcommand{\newpage}{}
+\renewcommand{\cleardoublepage}{}
+\renewcommand{\clearpage}{}
+\chapter{Multiscale Model of Antiviral Timing, Potency, and Heterogeneity Effects on an Epithelial Tissue Patch Infected by SARS-CoV-2}\label{cha:app:remdesivir}
+\endgroup
+\input{appendixes/remdesivir}
 
-\chapter{Experimental Equipment}
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+\newpage
+\chapter{Translating Model Specifications Appendix}\label{cha:app:translator}
+\input{appendixes/translator}
 
-\chapter{Data Processing}
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+\newpage
+\chapter{\pcps Appendix}\label{cha:app:pheno}
+\input{appendixes/phenocell}
 
 \end{appendices}
